@@ -19,6 +19,7 @@ import type { NodeWorkerSupervisorTransport } from "./node-registry-private.js";
 import { measureGatewayCloseStep, measureGatewayRestartTrace } from "./restart-trace.js";
 import { emitSessionsChanged } from "./server-methods/session-change-event.js";
 import { measureStartup, type GatewayStartupTrace } from "./server-startup-trace.js";
+import { retryStartupSqliteLock } from "./server-startup-sqlite-retry.js";
 import type { WorkerPlacementSessionWorkCancellation } from "./server-worker-placement-cancel.js";
 import {
   createGatewayWorkerPlacementChangePublisher,
@@ -636,12 +637,15 @@ export function createGatewayWorkerPlacementRuntime(params: GatewayWorkerPlaceme
       // close prelude drains it before uninstalling guards and stopping environments.
       for (const reconcile of [
         () =>
-          reconcilePhase("startup.workspaces", () =>
-            recoverGatewayWorkerPlacementWorkspaces({
-              placements: params.placements,
-              resolveWorkspace,
-              isStopping,
-            }),
+          retryStartupSqliteLock(
+            () => reconcilePhase("startup.workspaces", () =>
+              recoverGatewayWorkerPlacementWorkspaces({
+                placements: params.placements,
+                resolveWorkspace,
+                isStopping,
+              }),
+            ),
+            () => isStopping() || hooks.isClosePreludeStarted(),
           ),
         () => reconcilePhase("startup.active", () => dispatchService.reconcile("startup")),
       ]) {
