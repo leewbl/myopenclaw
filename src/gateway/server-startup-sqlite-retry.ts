@@ -4,7 +4,10 @@ import { isSqliteLockError } from "../infra/sqlite-error-diagnostics.js";
 export async function retryStartupSqliteLock<T>(
   run: () => Promise<T>,
   isClosing: () => boolean,
-  wait: () => Promise<void> = () => new Promise((resolve) => setTimeout(resolve, 250)),
+  wait: () => Promise<void> = () =>
+    new Promise((resolve) => {
+      setTimeout(resolve, 250);
+    }),
 ): Promise<T | undefined> {
   for (let attempt = 1; ; attempt++) {
     try {
