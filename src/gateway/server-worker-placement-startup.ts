@@ -18,8 +18,8 @@ import { createGitHubPublicationRuntime } from "./github-publication-runtime.js"
 import type { NodeWorkerSupervisorTransport } from "./node-registry-private.js";
 import { measureGatewayCloseStep, measureGatewayRestartTrace } from "./restart-trace.js";
 import { emitSessionsChanged } from "./server-methods/session-change-event.js";
-import { measureStartup, type GatewayStartupTrace } from "./server-startup-trace.js";
 import { retryStartupSqliteLock } from "./server-startup-sqlite-retry.js";
+import { measureStartup, type GatewayStartupTrace } from "./server-startup-trace.js";
 import type { WorkerPlacementSessionWorkCancellation } from "./server-worker-placement-cancel.js";
 import {
   createGatewayWorkerPlacementChangePublisher,
@@ -638,13 +638,14 @@ export function createGatewayWorkerPlacementRuntime(params: GatewayWorkerPlaceme
       for (const reconcile of [
         () =>
           retryStartupSqliteLock(
-            () => reconcilePhase("startup.workspaces", () =>
-              recoverGatewayWorkerPlacementWorkspaces({
-                placements: params.placements,
-                resolveWorkspace,
-                isStopping,
-              }),
-            ),
+            () =>
+              reconcilePhase("startup.workspaces", () =>
+                recoverGatewayWorkerPlacementWorkspaces({
+                  placements: params.placements,
+                  resolveWorkspace,
+                  isStopping,
+                }),
+              ),
             () => isStopping() || hooks.isClosePreludeStarted(),
           ),
         () => reconcilePhase("startup.active", () => dispatchService.reconcile("startup")),
