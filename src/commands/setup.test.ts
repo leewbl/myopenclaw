@@ -90,8 +90,8 @@ describe("setupCommand", () => {
       expect(snapshot.sourceConfig.messages?.queue).toBeUndefined();
       expect(snapshot.runtimeConfig.messages?.queue).toMatchObject({
         allowCollaborativeSteering: true,
-        collaborativeSteeringFallback: "queue",
       });
+      expect(snapshot.runtimeConfig.messages?.queue?.collaborativeSteeringFallback).toBeUndefined();
       if (json) {
         expect(runtime.log).toHaveBeenCalledOnce();
         expect(JSON.parse(String(runtime.log.mock.calls[0]?.[0]))).toEqual({

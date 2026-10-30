@@ -111,7 +111,8 @@ jobs:
                   file === ".github/workflows/codeql.yml" || file.startsWith(".github/codeql/"));
                 const workflow = (file) =>
                   file.startsWith(".github/workflows/") || file.startsWith(".github/actions/");
-                actions = policy || files.some(workflow);
+                // Fork PRs need every main-branch category for alert comparison.
+                actions = (process.env.GITHUB_REPOSITORY ?? "openclaw/openclaw") !== "openclaw/openclaw" || policy || files.some(workflow);
                 // Any other path conservatively retains every JavaScript category.
                 javascript = policy || files.some((file) => !workflow(file));
               } catch {

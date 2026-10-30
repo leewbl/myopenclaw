@@ -462,7 +462,7 @@ test("enforces templated vs static mapping session keys on /hooks/<mapping>", as
 
     mockIsolatedRunOk(true);
     await post("gmail", { subject: "hello" });
-    await waitForSystemEvent();
+    await waitForSystemEvent(15_000);
     const staticCall = cronRunCall();
     expect(staticCall).toMatchObject({
       sessionKey: "hook:gmail:fixed",

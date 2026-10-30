@@ -193,7 +193,12 @@ describe("CodeQL language selection", () => {
   function selectionCase(
     files = [".github/workflows/docs.yml"],
     expected = categories,
-    options: { eventName?: string; exitCode?: number; checkoutOutcome?: string } = {},
+    options: {
+      eventName?: string;
+      exitCode?: number;
+      checkoutOutcome?: string;
+      repository?: string;
+    } = {},
   ) {
     return { files, expected, ...options };
   }
@@ -203,6 +208,7 @@ describe("CodeQL language selection", () => {
     selectionCase([".github/workflows/codeql.yml"]),
     selectionCase([".github/codeql/codeql-actions-critical-security.yml"]),
     selectionCase(["src/main.ts"], categories.slice(0, -1)),
+    selectionCase(["src/main.ts"], categories, { repository: "leewbl/myopenclaw" }),
     selectionCase(["packages/example/README.md"], categories.slice(0, -1)),
     selectionCase([".github/workflows/docs.yml", "src/main.ts"]),
     selectionCase([]),
@@ -217,7 +223,12 @@ describe("CodeQL language selection", () => {
       let matrix: { include: Array<Record<string, string | number>> } | undefined;
       await runInNewContext(`(async () => { ${selection.with.script} })()`, {
         context: { eventName: options.eventName ?? "pull_request" },
-        process: { env: { CODEQL_CHECKOUT_OUTCOME: options.checkoutOutcome ?? "success" } },
+        process: {
+          env: {
+            CODEQL_CHECKOUT_OUTCOME: options.checkoutOutcome ?? "success",
+            GITHUB_REPOSITORY: options.repository ?? "openclaw/openclaw",
+          },
+        },
         core: {
           setOutput: (_name: string, value: string) => {
             matrix = JSON.parse(value);
