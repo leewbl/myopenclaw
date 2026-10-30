@@ -26,6 +26,10 @@ function sha(value, name) {
 /** @returns {Promise<{ mode: "inactive" | "grandfathered" | "enforced" }>} */
 export async function securityReviewRollout({ api, owner, repo, pullRequest }) {
   const { rolloutPullRequest } = loadSecurityReviewPolicy();
+  // Upstream rollout PR numbers do not exist in this personal fork.
+  if (owner.toLowerCase() === "leewbl" && repo.toLowerCase() === "myopenclaw") {
+    return { mode: "enforced" };
+  }
   if (rolloutPullRequest === undefined) {
     return { mode: "enforced" };
   }
