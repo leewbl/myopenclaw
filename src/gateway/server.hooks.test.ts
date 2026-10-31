@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { withinTest } from "../../test/helpers/promise.js";
 import { resolveMainSessionKeyFromConfig as resolveMainKey } from "../config/sessions.js";
 import type { HooksConfig, HookMappingConfig } from "../config/types.hooks.js";
 import type { DeferredHookWake } from "../cron/wake-contract.js";
@@ -545,7 +546,7 @@ test("dispatches agent hooks when the process clock is outside the Date range", 
   });
 });
 
-test("enforces hooks.allowedAgentIds for effective agent routing", async () => {
+test("enforces hooks.allowedAgentIds for effective agent routing", async ({ signal }) => {
   configureHooks({
     allowedAgentIds: ["hooks"],
     mappings: [
@@ -568,8 +569,20 @@ test("enforces hooks.allowedAgentIds for effective agent routing", async () => {
     expect(cronIsolatedRun).not.toHaveBeenCalled();
 
     mockIsolatedRunOk(true);
-    await post("agent", { message: "Allowed", agentId: "hooks", wakeMode: "next-heartbeat" });
-    const targetEvents = await waitForSystemEventTexts(HOOKS_MAIN_SESSION_KEY);
+    const terminalWake = Promise.withResolvers<Awaited<DeferredHookWakePromise>>();
+    terminalWakeObserver.observe = (result) => {
+      void result.then(terminalWake.resolve, terminalWake.reject);
+    };
+    try {
+      await post("agent", { message: "Allowed", agentId: "hooks", wakeMode: "next-heartbeat" });
+      expect(await withinTest(terminalWake.promise, signal)).toMatchObject({
+        ok: true,
+        eventOutcome: "queued",
+      });
+    } finally {
+      terminalWakeObserver.observe = undefined;
+    }
+    const targetEvents = peekSystemEventEntries(HOOKS_MAIN_SESSION_KEY).map((event) => event.text);
     expect(targetEvents.join("\n")).toContain("Hook Hook: done");
     expect(peekSystemEventEntries(resolveMainKey())).toStrictEqual([]);
     const allowedCall = cronRunCall();

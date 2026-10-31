@@ -124,13 +124,16 @@ export function registerGatewayStartupReadinessTests(params: {
     },
   );
 
-  it("emits a sidecar readiness summary in startup trace details", async () => {
+  it("emits a sidecar readiness summary in startup trace details", async ({ signal }) => {
     const trace: GatewayStartupTrace = {
       detail: vi.fn(),
       mark: vi.fn(),
       measure: async (_name, run) => await run(),
     };
-    await params.start(params.createParams({ startupTrace: trace }));
+    const runtime = await params.start(params.createParams({ startupTrace: trace }));
+    // The post-ready observer continues after start resolves and shares the next
+    // test's registry mock. Finish it before the fixture advances.
+    await withinTest(runtime.subagentRecoverySettled, signal);
 
     expect(trace.mark).toHaveBeenCalledWith("sidecars.ready");
     expect(trace.detail).toHaveBeenCalledWith("sidecars.ready", [
