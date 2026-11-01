@@ -1,0 +1,85 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nWith only official plugins loaded, native delayed sessions_send completions create a new thread beneath a top-level Slack request despite replyToMode off and no explicit thread target in the final message-tool call.\n\n### Steps to reproduce\n\n1. Use official OpenClaw, Slack and Codex 2026.10.8 with only codex, openai and slack plugins enabled; disable other channels and scheduled work. Retain existing Executive and specialist conversations.\n2. From the main Slack channel composer, ask the Executive to use sessions_send with mode followup and timeoutSeconds 0. Ask the persistent specialist to return a synthetic marker without tools or service access.\n3. Have the Executive acknowledge pending and end the initiating turn, allowing native delayed completion rather than polling.\n4. Inspect the executed final message-tool call, its delivery receipt and conversations.replies.\n5. Control: send an overlapping request from an actual reply inside an existing thread; inspect its completion placement.\n\n### Expected behavior\n\nPreserve the originating conversation scope: a top-level request gets a top-level completion when replyToMode is off; a genuine thread request gets its completion in that same thread. Reference: https://docs.openclaw.ai/channels/slack/threads-and-sessions . Our initial pending acknowledgements were correctly top-level, and an overlapping genuine-thread control retained its original thread.\n\n### Actual behavior\n\nOfficial-only R12: R12_PENDING appeared top-level, then this final call ran:\n\n{\"action\":\"send\",\"message\":\"R12_COMPLETE COMMIT_R12_OK\",\"final\":true}\n\nNo threadId or replyTo was supplied. The delivery receipt nevertheless had threadId equal to the original top-level user message timestamp; conversations.replies confirmed the answer in a new thread. No missing-summary fallback occurred in R12.\n\nOfficial-only R10 also misrouted, together with the separate finalization error. The overlapping R11 deliberate-thread control kept its pending acknowledgement and final answer in the original thread.\n\n### OpenClaw version\n\n2026.10.8 (openclaw, @openclaw/slack, @openclaw/codex; official npm packages, unmodified)\n\n### Operating system\n\nmacOS arm64 (current host: 26.6.2, build 25G83); Node 24.22.1\n\n### Install method\n\nnpm, exact pinned official packages; local development gateway\n\n### Model\n\nopenai/gpt-6-sol; medium thinking\n\n### Provider / routing chain\n\nOpenClaw -> official @openclaw/codex harness -> configured local Unix Codex app-server 0.158.0 -> OpenAI\n\n### Additional provider/model setup details\n\nIsolation run on 2026-10-28: only official codex, openai and slack plugins loaded, confirmed by the running gateway configuration and plugin registry. All custom plugins, other channels, heartbeats and cron were disabled. Host tools were limited to sessions_send and message. Existing persistent peer sessions and workspaces were retained; these are not sessions_spawn children. Slack Socket Mode; replyToMode off globally and per channel, followup queue. Core, Slack and managed Codex package files matched integrity-pinned official npm tarballs; only the installation marker .openclaw-lifecycle-pending was absent. No package code was patched.\n\n### Logs\n\n```shell\nSanitized official-only R12 receipt relationship:\norigin: main channel composer, no source thread\nfinal call: {\"action\":\"send\",\"message\":\"R12_COMPLETE COMMIT_R12_OK\",\"final\":true}\nfinal receipt: threadId == original top-level user message ts\nSlack conversations.replies: exactly one R12 final in a new thread\n\nRelative to accepted/pending receipt: peer result mirrored +4.006s; final delivery +8.556s.\n```\n\n### Screenshots, recordings, and evidence\n\nOfficial-only tests, 2026-10-28:\n\n| Case | Origin / protocol | Outcome |\n|---|---|---|\n| R10 | Top-level, zero wait, no initial final answer | Final in unwanted new thread; separate missing-summary error |\n| R11 | Deliberate reply in existing R10 thread, pending acknowledgement | Pending and final remain in same thread |\n| R12 | Top-level, pending acknowledgement, overlapping R11 | Pending in main; final in unwanted new thread |\n\nEach R10-R12 final marker was observed once in captured Slack replies. The Calendar and Commitment specialist replies made zero tool calls and retained their prior session IDs. R9 showed the same unwanted thread after an earlier local-model transport retry; it is excluded from clean timing comparisons.\n\nEarlier tests with integrations enabled reproduced this in R4/R6/R7 and a fresh private channel/requester R8. In R7, the executed timeoutSeconds 120 still returned accepted/pending immediately.\n\n### Impact and severity\n\nAffected: our Slack Executive/specialist workflow. R10 and R12 reproduced unwanted threads with only official plugins loaded; R11 retained its deliberate thread. The answer exists but appears in an unsolicited thread instead of the requested main channel. This blocks acceptance of native delayed-completion routing; no data loss is established.\n\n### Additional information\n\nThe custom-plugin isolation gap has now been tested: custom plugin execution is not required for this failure. Existing workspaces and conversation histories were retained, so historical context effects are not fully excluded. The exact internal routing handoff is not traced. No known-good release was established.\n\nRelated reports/changes for triage: #142037, #148721 and #158284 / #158319. This is real Slack ingress, not an artificial conversation-binding fixture. We are not claiming the same internal cause or recommending the guard from #158319. R11 used an already-existing outbound-created thread; it is not evidence of a new parent-session fork.\n\nAll examples are synthetic. Private messages, workspace/channel/user IDs, tokens and credentials are omitted. Raw traces are retained privately and can be reduced to requested fields.",
+  "closedByPullRequestsReferences": [],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABgfVDmQ",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nKeep open: current source promotes Slack’s synthetic reply anchor into the delayed completion’s thread destination, matching the official-release report; the linked work does not fix this handoff.\n\nReproducibility: Current source establishes the anchor-to-thread promotion and its delayed-delivery consumer, consistent with the reporter’s official-release R12 result; this review ran no tests or live Slack reproduction.\n\n**Next step**\nFix hosted sessions_send route capture and first establish a failing delayed-completion regression pairing top-level Slack ingress under replyToMode off with a genuine threaded request.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nCapture actual requester conversation scope without promoting Slack’s optional reply anchor into a mandatory completion thread.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent source establishes the anchor-to-thread promotion and its delayed-delivery consumer, consistent with the reporter’s official-release R12 result; this review ran no tests or live Slack reproduction.\n\nIs this the best way to solve the issue?\n\nRepairing requester-route capture is the narrow solution; preserve intentional Slack reply anchors and genuine bound threads rather than applying the rejected announce-binding guard or changing delivery bookkeeping.\n\nAGENTS.md: found and applied where relevant.\n\nRemaining risk / open question:\n\n- A current-main production-path regression and real Slack replay remain unrun; retained-session and overlapping-request behavior need paired coverage.\n\nCodex review notes: model internal, reasoning medium; reviewed against [5ff57b8e742f](https://github.com/openclaw/openclaw/commit/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `issue-rating: 🦞 diamond lobster`: Current issue advisory state selects this label.\n- add `clawsweeper:source-repro`: Current issue advisory state selects this label.\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n- remove `clawsweeper:no-new-fix-pr`: Current issue advisory state no longer selects this label.\n- remove `clawsweeper:needs-maintainer-review`: Current issue advisory state no longer selects this label.\n- remove `clawsweeper:needs-info`: Current issue advisory state no longer selects this label.\n- remove `issue-rating: 🦐 gold shrimp`: Current issue advisory state no longer selects this label.\n\nLabel justifications:\n\n- `P2`: Delayed Slack answers reach an unexpected thread in a bounded delegation workflow; delivery still succeeds and no data loss is established.\n- `impact:message-loss`: Completion messages are misrouted away from the originating top-level conversation.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- pnpm test src/agents/tools/conversation-tools.test.ts src/agents/tools/sessions-send-reply-flow.requester.test.ts src/agents/tools/sessions-send-tool.a2a.test.ts --maxWorkers=1\n- pnpm test extensions/slack/src/threading-tool-context.test.ts extensions/slack/src/threading.test.ts --maxWorkers=1\n- pnpm check:changed\n- git diff --check\n- Demonstrate the new production-composition regression fails on base and passes with the repair.\n\nWhat I checked:\n\n- **Official-release report with paired control:** The reporter identifies unmodified 2026.10.8 packages, official-only R12 top-level ingress, an implicit final send, and a receipt threaded beneath the original message; R11 preserves a genuine thread, and R12 has no finalization fallback.\n- **Slack distinguishes reply anchors from actual threads:** currentThreadTs falls back to CurrentMessageId even when sameChannelThreadRequired is false; the accompanying test explicitly preserves that distinction. ([`extensions/slack/src/threading-tool-context.ts:28`](https://github.com/openclaw/openclaw/blob/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd/extensions/slack/src/threading-tool-context.ts#L28), [5ff57b8e742f](https://github.com/openclaw/openclaw/commit/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd))\n- **Concrete route-capture defect:** createHostedConversationTools assigns currentThreadTs to requesterOrigin.threadId without distinguishing a synthetic anchor from an actual source thread. ([`src/agents/tools/conversation-tools.ts:200`](https://github.com/openclaw/openclaw/blob/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd/src/agents/tools/conversation-tools.ts#L200), [5ff57b8e742f](https://github.com/openclaw/openclaw/commit/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd))\n- **Delayed delivery preserves the promoted anchor:** The completion-owned path explicitly forwards requesterOrigin.threadId to the requester agent call; the peer path also passes the captured delivery context through runAgentStep. ([`src/agents/tools/sessions-send-reply-flow.ts:102`](https://github.com/openclaw/openclaw/blob/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd/src/agents/tools/sessions-send-reply-flow.ts#L102), [5ff57b8e742f](https://github.com/openclaw/openclaw/commit/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd))\n- **Thread promotion changes outbound behavior:** An explicit message or transport thread forces effectiveReplyToMode to all; Slack action threading then inherits that thread for same-channel sends, explaining why an implicit final send can become threaded. ([`extensions/slack/src/threading-tool-context.ts:34`](https://github.com/openclaw/openclaw/blob/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd/extensions/slack/src/threading-tool-context.ts#L34), [5ff57b8e742f](https://github.com/openclaw/openclaw/commit/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd))\n- **Documented conversation contract and maturity:** https://docs.openclaw.ai/channels/slack/threads-and-sessions distinguishes ordinary top-level messages from genuine threads and documents replyToMode off; the Slack primary-owner surface is M3 in qa/maturity-scores.yaml and taxonomy.yaml, so maturity:stable does not apply. ([`docs/channels/slack/threads-and-sessions.md:19`](https://docs.openclaw.ai/channels/slack/threads-and-sessions), [5ff57b8e742f](https://github.com/openclaw/openclaw/commit/5ff57b8e742f05b9e6e73b2bfe95866f394c15fd))\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 28, 2026, 1:06 PM ET / 17:06 UTC._\n\n<!-- clawsweeper-review-version item=186914 reviewed_at=2026-10-28T17:06:28.990Z sha=na source_revision=84299e6e87afabf07bf84e7bf91936c97d21473b84c9e61ff004cc69fba597b3 lease_owner=github-run-40731505686-1 lease_comment_id=6475356871 v=1 -->\n\n<!-- clawsweeper-review item=186914 -->",
+      "createdAt": "2026-10-28T16:58:33Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/186914#issuecomment-6475301785",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-10-28T16:49:55Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjhKINQ",
+      "name": "impact:message-loss",
+      "description": "Channel message delivery can be lost, duplicated, or misrouted.",
+      "color": "D93F0B"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    }
+  ],
+  "number": 186914,
+  "state": "OPEN",
+  "title": "[Bug]: Slack delayed sessions_send completion creates a thread for a top-level request (2026.10.8)",
+  "updatedAt": "2026-10-28T17:07:28Z",
+  "url": "https://github.com/openclaw/openclaw/issues/186914",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": []
+}

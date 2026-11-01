@@ -1,0 +1,130 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nOn the operator approval page (`/approve/system-agent:…`, \"Operator approval\", for `install plugin @openclaw/sms`), the Allow button's label is white on a very light background, so the button reads as empty. It works when clicked (\"Approved here — The operation was approved for this request only.\"), but an owner cannot see what they are about to press.\n\n### Steps to reproduce\n\n1. Have the agent propose a change through the `openclaw` tool; open the `/approve/…` link it relays.\n2. Look at the Allow button.\n\n### Expected behavior\n\nThe Allow and Deny buttons are legible in both the light and dark themes.\n\n### Actual behavior\n\nThe Allow label is white on a near-white background.\n\n### OpenClaw version\n\n`2026.9.1` (commit `ad6fe23`), the official Docker image `ghcr.io/openclaw/openclaw:2026.9.1-browser`\n\n### Operating system\n\nthe image's Debian, in Docker on an Ubuntu 24.04 host\n\n### Install method\n\nDocker Compose; onboarding by `openclaw onboard --non-interactive`\n\n### Model\n\n`openai/gpt-5.6-sol` through the ChatGPT subscription sign-in\n\n### Provider / routing chain\n\nOpenAI (ChatGPT sign-in) → `openai/gpt-5.6-sol`, no fallbacks configured\n\n### Additional provider/model setup details\n\nnone beyond the above\n\n### Logs\n\n```shell\n\n```\n\n### Screenshots, recordings, and evidence\n\n_No response_\n\n### Impact and severity\n\nCosmetic, but on the one page an owner is asked to make a security decision; an invisible Allow next to a visible Deny reads as a broken page.\n\n### Additional information\n\nObserved on `2026.9.1`, official `-browser` image; the link opened from Telegram in a laptop browser.",
+  "closedByPullRequestsReferences": [],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABU4edCw",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nThe contrast defect remains in current main, and the linked fix PR closed without merging; this issue still warrants a focused repair.\n\nReproducibility: Current markup and CSS establish the failure: the light-theme ordinary-button rule overrides the background while the standalone Allow once rule retains white text; no live reproduction was run.\n\n**Root-cause cluster**\nRelationship: `canonical`\nCanonical: https://github.com/openclaw/openclaw/issues/149994\nSummary: This issue remains the canonical contrast report; its former fix closed unmerged, and merged scope-display work addressed a separate concern.\n\nMembers:\n- `fixed_by_candidate`: https://github.com/openclaw/openclaw/pull/150045 - Historical candidate for the same defect, closed without merging after the renderer migration.\n- `adjacent_distinct`: https://github.com/openclaw/openclaw/pull/164534 - Merged approval scope display explicitly excluded the contrast repair.\n\nProposal only: this assessment does not dispatch repair, suppress jobs, mutate sibling items, close, or merge anything.\n\n**Next step**\nFix the Solid approval renderer’s Allow once styling and establish a failing light-theme contrast regression before opening a PR.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nUse the shared primary-button variant for Allow once and remove its competing local color rules.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent markup and CSS establish the failure: the light-theme ordinary-button rule overrides the background while the standalone Allow once rule retains white text; no live reproduction was run.\n\nIs this the best way to solve the issue?\n\nReusing the existing primary variant matches the in-app approval card and avoids another competing color policy.\n\nAGENTS.md: found and applied where relevant.\n\nRemaining risk / open question:\n\n- Computed browser contrast and visual appearance were not exercised during this read-only review.\n\nCodex review notes: model internal, reasoning medium; reviewed against [bf9709250b87](https://github.com/openclaw/openclaw/commit/bf9709250b87bec4a26637046096092ee68d3366).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n- remove `clawsweeper:no-new-fix-pr`: Current issue advisory state no longer selects this label.\n- remove `clawsweeper:linked-pr-open`: Current issue advisory state no longer selects this label.\n\nLabel justifications:\n\n- `P2`: The unreadable approval label has limited blast radius, and the reported button remains functional.\n- `impact:ux-friction`: Operators cannot readily identify the Allow action while reviewing an approval.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- Establish a failing light-theme computed-contrast regression on the unchanged base, then verify it passes with the repair.\n- pnpm test:ui:e2e ui/src/e2e/approval-page.e2e.test.ts\n- pnpm lint:ui:styles\n- pnpm check:changed\n- git diff --check\n\nWhat I checked:\n\n- **Current renderer retains the defect:** ApprovalContent renders every decision with btn and its approval-page modifier, without primary for allow-once. ([`ui/src/pages/approval/approval-presentation.tsx:296`](https://github.com/openclaw/openclaw/blob/bf9709250b87bec4a26637046096092ee68d3366/ui/src/pages/approval/approval-presentation.tsx#L296), [bf9709250b87](https://github.com/openclaw/openclaw/commit/bf9709250b87bec4a26637046096092ee68d3366))\n- **Conflicting foreground and background owners:** The local allow-once rule sets primary-foreground, while the more specific light-theme selector overrides its background because the button lacks primary or danger; light tokens define white foreground and near-white background. ([`ui/src/styles/approval.css:299`](https://github.com/openclaw/openclaw/blob/bf9709250b87bec4a26637046096092ee68d3366/ui/src/styles/approval.css#L299), [bf9709250b87](https://github.com/openclaw/openclaw/commit/bf9709250b87bec4a26637046096092ee68d3366))\n- **Shared light-theme override:** The light-theme ordinary-button selector has greater specificity than the standalone allow-once selector and sets background to var(--bg). ([`ui/src/styles/components.css:1116`](https://github.com/openclaw/openclaw/blob/bf9709250b87bec4a26637046096092ee68d3366/ui/src/styles/components.css#L1116), [bf9709250b87](https://github.com/openclaw/openclaw/commit/bf9709250b87bec4a26637046096092ee68d3366))\n- **Existing styling contract:** The adjacent in-app approval card already assigns btn primary to allow-once, providing an existing shared styling owner for the repair. ([`ui/src/components/exec-approval-card-solid.tsx:165`](https://github.com/openclaw/openclaw/blob/bf9709250b87bec4a26637046096092ee68d3366/ui/src/components/exec-approval-card-solid.tsx#L165), [bf9709250b87](https://github.com/openclaw/openclaw/commit/bf9709250b87bec4a26637046096092ee68d3366))\n- **Former fix is closed unmerged:** https://github.com/openclaw/openclaw/pull/150045 explicitly targeted this defect, but GitHub reports closed and merged=false; leilei3167 explained that its old approval-page.ts target had been replaced by Solid.\n- **Merged adjacent work excludes contrast:** https://github.com/openclaw/openclaw/pull/164534 added approval scope display and explicitly states that Allow once contrast was unchanged. ([17b92c6988cd](https://github.com/openclaw/openclaw/commit/17b92c6988cd2ca9effdc8db5443ee9edd1a106c))\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 28, 2026, 5:46 PM ET / 21:46 UTC._\n\n<!-- clawsweeper-review-version item=149994 reviewed_at=2026-10-28T21:46:44.420Z sha=na source_revision=78ee5f315a07f10bedd306ddb52be65ad42a7fac27870bf5bbba7de7b8289fd9 lease_owner=github-run-40774263032-1 lease_comment_id=6481418353 v=1 -->\n\n<!-- clawsweeper-review item=149994 -->",
+      "createdAt": "2026-09-16T10:58:53Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/149994#issuecomment-5696363787",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABU4e_BQ",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "<!-- clawsweeper-command-status:149994:implement_issue:auto -->\n🦞⚠️\nAutomatic implementation stopped before completion.\nReason: The automatic implementation worker stopped before all deterministic gates completed. Open the workflow run for the exact blocker.\nWorker: https://github.com/openclaw/clawsweeper/actions/runs/35087936707\n\n<!-- clawsweeper-issue-implementation-progress:start -->\nAutomatic implementation progress:\n- State: Planning\n- Detail: Codex is reading the issue and repository, choosing an implementation, and planning validation.\n- Run: https://github.com/openclaw/clawsweeper/actions/runs/35098321762\n- Updated: 2026-09-16T12:56:53.230Z\n- Opt out: add `clawsweeper:manual-only` or `clawsweeper:human-review`.\n<!-- clawsweeper-issue-implementation-progress:end -->\n",
+      "createdAt": "2026-09-16T10:59:38Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/149994#issuecomment-5696372485",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABU5MvWQ",
+      "author": {
+        "login": "leilei3167"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Looking into this — the Allow label contrast on `/approve` in light mode looks like a CSS cascade issue with the shared `.btn` styles. I’ll put up a small presentation-only fix shortly.",
+      "createdAt": "2026-09-16T12:05:04Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/149994#issuecomment-5697122137",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABglG-rQ",
+      "author": {
+        "login": "openclaw-barnacle"
+      },
+      "authorAssociation": "NONE",
+      "body": "This bug report has had no qualifying human activity for 30 days. Please retest on the current release and share the result.\nWithout new human activity, Barnacle may close it as not planned 14 days after this message was posted. This is administrative inactivity cleanup, not a claim that the problem is fixed.\nA human update restarts the inactivity clock; a new PR head also restarts it. A maintainer can add no-stale for a durable hold, or bad-barnacle to suppress Barnacle. Remove the hold when work can resume.\n<!-- barnacle-stale:v2 item=149994 kind=issue lane=bug head=none -->\n",
+      "createdAt": "2026-10-28T21:41:03Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/149994#issuecomment-6481362605",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-09-16T10:51:44Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACqFVeuw",
+      "name": "impact:ux-friction",
+      "description": "User-facing flow adds avoidable confusion or support burden without fully blocking progress.",
+      "color": "FBCA04"
+    }
+  ],
+  "number": 149994,
+  "state": "OPEN",
+  "title": "[Bug]: the /approve page's Allow button is white text on a near-white background — it looks like an empty button",
+  "updatedAt": "2026-10-28T21:47:31Z",
+  "url": "https://github.com/openclaw/openclaw/issues/149994",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": []
+}

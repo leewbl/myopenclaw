@@ -1,0 +1,355 @@
+{
+  "benchmark_id": "openclaw-bugs-v1",
+  "source_base_sha": "54710b123fe94a2139930c1d7c038e7623345a5e",
+  "manifest_sha256": "16c3705cd1e0b669bda60b8a764ada24005c86afcfa87e107e2ded3451ffae03",
+  "baseline_commit": "54710b123fe94a2139930c1d7c038e7623345a5e",
+  "workbench_commit": "effc347df42f45037dad0a4bbe2a2cb7e53d363a",
+  "model": "not_run",
+  "implementer": "not_run",
+  "track": "fresh",
+  "resource_policy": {
+    "seconds": null,
+    "iterations": null,
+    "cost_policy": "stop-on-provider-error",
+    "parallelism": 1
+  },
+  "environment": {
+    "image_digest": null,
+    "node": null,
+    "pnpm": null,
+    "lockfile_sha256": null,
+    "prompt_sha256": null
+  },
+  "cases": [
+    {
+      "issue": 149994,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 180815,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 180379,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 183389,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 186914,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 185317,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 183700,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 159790,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 185079,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    },
+    {
+      "issue": 185534,
+      "outcome": "not_run",
+      "candidate_sha": null,
+      "human_intervention": false,
+      "elapsed_seconds": null,
+      "iterations": null,
+      "tokens": null,
+      "cost": null,
+      "notes": "Baseline applicability and reproduction not yet executed.",
+      "stages": {
+        "reproduce": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "fix": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "regression": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        },
+        "independent": {
+          "verified": false,
+          "reviewer": null,
+          "evidence": []
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nOn a personal install, `memory.search.rememberAcrossConversations` is effectively `true` (the docs say it \"defaults on for personal installs\"), but the bundled `active-memory` plugin that implements it is disabled by default (`openclaw plugins inspect active-memory` → `Reason: bundled (disabled by default)`). The docs for the setting say \"Active Memory must remain enabled,\" yet nothing tells the user it isn't: setup, `openclaw doctor`, `openclaw doctor --lint` and the Control UI are all silent.\n\nThe result is that the agent looks configured to remember across conversations but never runs the recall pass. In our case this went unnoticed for about two months and showed up only as the agent seeming \"forgetful\" about things discussed in earlier conversations.\n\n### Steps to reproduce\n\n1. Personal install, `session.dmScope` unset, no `plugins.entries.active-memory` entry (the out-of-the-box state).\n2. `memory.search.rememberAcrossConversations` is `true` (default, or set explicitly).\n3. Run `openclaw plugins list`: Active Memory shows `disabled`.\n4. Run `openclaw doctor` and `openclaw doctor --lint`: no finding about the mismatch.\n5. Ask the agent about something from a previous conversation: no Active Memory recall runs (no `active-memory:` lines in the gateway log).\n\n### Expected behavior\n\nOne of:\n- Doctor (and ideally `openclaw memory status`) reports that `rememberAcrossConversations` is on but the `active-memory` plugin is disabled, and names the setting that fixes it. This would follow the pattern of #160320, which added a similar diagnostic for `memory.search.sources: [\"sessions\"]` being a silent no-op; or\n- enabling `rememberAcrossConversations` (or having it default on) also enables the plugin, or setup offers to enable it.\n\n### Actual behavior\n\nThe setting reads as enabled, the plugin stays disabled, and no surface reports the mismatch. After enabling the plugin (`plugins.entries.active-memory.enabled: true`, hot-applied, no restart), recall started working immediately: the gateway log shows `active-memory: … start timeoutMs=15000` followed by `done status=ok elapsedMs≈5400 summaryChars≈200`, and the agent answered questions about earlier conversations correctly, citing the right memory note.\n\n### OpenClaw version\n\n2026.10.7 (157d8c2). The setting has been present in our config since early October (2026.9.x); the plugin was never enabled in any config version since then.\n\n### Operating system\n\nWindows 11 + WSL2 (Ubuntu 26.04.1 LTS), Node 26.12.1, gateway as a systemd user service\n\n### Install method\n\nnpm (global), updated via the managed updater\n\n### Model\n\nopenai/gpt-5.6-terra (main and Active Memory recall)\n\n### Provider / routing chain\n\nOpenAI primary, Anthropic fallback. Memory search: `provider: \"local\"` (managed llama.cpp provider, EmbeddingGemma-300M QAT Q8_0), sources memory + sessions.\n\n### Additional provider/model setup details\n\n_No response_\n\n### Logs\n\n```shell\n[reload] config hot reload applied (plugins.entries.active-memory)\n[plugins] active-memory: agent=main session=agent:main:dashboard:<id> ... start timeoutMs=15000 queryChars=440 searchQueryChars=63\n[plugins] active-memory: recall skipped reason=session-ineligible\n[plugins] active-memory: agent=main session=agent:main:dashboard:<id> ... done status=ok elapsedMs=5412 summaryChars=175\n```\n\n### Screenshots, recordings, and evidence\n\n_No response_\n\n### Impact and severity\n\nMedium. Likely affects most personal installs that never enabled the plugin by hand. Nothing breaks, but cross-conversation recall (the main benefit of the setting) silently never runs, so users experience an agent that forgets earlier conversations and have no diagnostic pointing to the cause.\n\n### Additional information\n\nRelated question (Control UI chats):\n\nWith the plugin enabled, every Control UI dashboard chat we tested (`agent:main:dashboard:<id>`, an existing one and a fresh one from `/new`) logs `active-memory: recall skipped reason=session-ineligible` for the cross-conversation transcript lane, while the memory lookup itself runs. The docs limit that lane to \"private direct or persistent explicit UI conversations,\" but don't say how dashboard chats are classified. For a single-operator personal install, the Control UI is the main place people talk to their agent. Is excluding dashboard chats intended? If so, could the docs say so, and could `/active-memory status` show the reason?",
+  "closedByPullRequestsReferences": [
+    {
+      "id": "PR_kwDOQb6kR88AAAABKm3Lmw",
+      "number": 183729,
+      "repository": {
+        "id": "R_kgDOQb6kRw",
+        "name": "openclaw",
+        "owner": {
+          "id": "O_kgDODxG9fw",
+          "login": "openclaw"
+        }
+      },
+      "url": "https://github.com/openclaw/openclaw/pull/183729"
+    }
+  ],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABfXmQUw",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nThis issue identifies a current bug: Doctor treats an absent Active Memory entry as available, although the plugin loader disables that bundled plugin by default.\n\nReproducibility: Current source establishes the mismatch: personal-install recall resolves true, bundled Active Memory resolves disabled, and Doctor accepts its absent entry as available; no runtime reproduction or tests were executed in this read-only review.\n\n**Next step**\nFix Doctor's effective-plugin availability check and establish a failing regression for personal-install recall with no Active Memory entry.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nHave Doctor report effective Active Memory disablement and name the existing enable setting while preserving recall defaults and privacy boundaries.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent source establishes the mismatch: personal-install recall resolves true, bundled Active Memory resolves disabled, and Doctor accepts its absent entry as available; no runtime reproduction or tests were executed in this read-only review.\n\nIs this the best way to solve the issue?\n\nCorrecting Doctor's availability check through the existing activation owner is a bounded solution matching the requested diagnostic alternative; automatic enablement would unnecessarily change product behavior.\n\nAGENTS.md: found and applied where relevant.\n\nRemaining risk / open question:\n\n- The dashboard-chat observation is not independently reproduced and may involve a separate eligibility boundary; it should not expand this repair.\n\nCodex review notes: model internal, reasoning medium; reviewed against [fd0106458369](https://github.com/openclaw/openclaw/commit/fd010645836972f68322cd4dd823109f3b4ac628).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `P2`: Cross-conversation recall silently fails for a concrete configuration, with an existing manual enablement workaround and no demonstrated loss of stored transcripts.\n- add `impact:session-state`: The agent omits intended recall from earlier private conversations.\n- add `impact:ux-friction`: The enabled setting and silent Doctor result conceal the missing plugin prerequisite.\n- add `issue-rating: 🦞 diamond lobster`: Current issue advisory state selects this label.\n- add `clawsweeper:source-repro`: Current issue advisory state selects this label.\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n\nLabel justifications:\n\n- `P2`: Cross-conversation recall silently fails for a concrete configuration, with an existing manual enablement workaround and no demonstrated loss of stored transcripts.\n- `impact:session-state`: The agent omits intended recall from earlier private conversations.\n- `impact:ux-friction`: The enabled setting and silent Doctor result conceal the missing plugin prerequisite.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- Establish a red regression for an absent Active Memory entry with implicitly enabled personal-install recall, then verify it passes with the fix.\n- node scripts/run-vitest.mjs src/commands/doctor-memory-search.test.ts src/commands/doctor-memory-search-sources.test.ts\n- Run affected activation-owner tests if its contract changes, plus targeted typecheck, lint, and format checks.\n- Using isolated configuration and state, compare normal Doctor output and openclaw doctor --lint --only core/doctor/memory-search --json before and after the fix.\n- Verify explicitly enabling Active Memory removes the prerequisite warning and explicitly disabling cross-conversation recall suppresses it.\n\nWhat I checked:\n\n- **Current diagnostic misses absent plugin entries:** The availability predicate uses entry?.enabled !== false, so a missing active-memory entry passes and suppresses the existing disabled-plugin warning. ([`src/commands/doctor-memory-search.ts:133`](https://github.com/openclaw/openclaw/blob/fd010645836972f68322cd4dd823109f3b4ac628/src/commands/doctor-memory-search.ts#L133), [fd0106458369](https://github.com/openclaw/openclaw/commit/fd010645836972f68322cd4dd823109f3b4ac628))\n- **Activation owner disagrees with Doctor:** Without explicit enablement, auto-enablement, or enabledByDefault, the activation resolver returns disabled with reason 'bundled (disabled by default)'; Active Memory's manifest declares onStartup but no default enablement. ([`src/plugins/config-activation-shared.ts:160`](https://github.com/openclaw/openclaw/blob/fd010645836972f68322cd4dd823109f3b4ac628/src/plugins/config-activation-shared.ts#L160), [fd0106458369](https://github.com/openclaw/openclaw/commit/fd010645836972f68322cd4dd823109f3b4ac628))\n- **Personal-install default and documented contract:** The resolver enables recall when global dmScope is absent or main and no binding overrides it; the documentation promises a retrieval pass before eligible private replies and requires Active Memory to remain enabled: https://docs.openclaw.ai/concepts/active-memory/enabling. ([`packages/memory-host-sdk/src/host/config-utils.ts:102`](https://github.com/openclaw/openclaw/blob/fd010645836972f68322cd4dd823109f3b4ac628/packages/memory-host-sdk/src/host/config-utils.ts#L102), [fd0106458369](https://github.com/openclaw/openclaw/commit/fd010645836972f68322cd4dd823109f3b4ac628))\n- **Existing tests cover a different disablement case:** The disabled-plugin diagnostic test supplies enabled:false explicitly, which does not exercise the reported absent-entry case; normal Doctor and the lint collector consume the same inspection function. ([`src/commands/doctor-memory-search.test.ts:311`](https://github.com/openclaw/openclaw/blob/fd010645836972f68322cd4dd823109f3b4ac628/src/commands/doctor-memory-search.test.ts#L311), [fd0106458369](https://github.com/openclaw/openclaw/commit/fd010645836972f68322cd4dd823109f3b4ac628))\n- **Feature history and original diagnostic:** Merged https://github.com/openclaw/openclaw/pull/100140 introduced protected recall and an availability check that accepted unspecified plugin enablement; merged https://github.com/openclaw/openclaw/pull/110597 subsequently enabled recall by default for personal installs. ([`src/commands/doctor-memory-search.ts:122`](https://github.com/openclaw/openclaw/blob/4b3ee5e7eb623368d367a5fc2fa3712bc8095f16/src/commands/doctor-memory-search.ts#L122), [4b3ee5e7eb62](https://github.com/openclaw/openclaw/commit/4b3ee5e7eb623368d367a5fc2fa3712bc8095f16))\n- **Referenced diagnostic is adjacent work:** Merged https://github.com/openclaw/openclaw/pull/160320 diagnoses requested session sources being excluded by indexing opt-ins; it does not correct Active Memory plugin availability. ([e36dfd716be6](https://github.com/openclaw/openclaw/commit/e36dfd716be6a1d0dbb640f696c2be7c518d0e36))\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 25, 2026, 12:20 PM ET / 16:20 UTC._\n\n<!-- clawsweeper-review-version item=183700 reviewed_at=2026-10-25T16:20:04.216Z sha=na source_revision=838767bef770acb0613e32358052846ddb673f0bf34c4fb5411b86fefb13fc32 lease_owner=github-run-40210837941-1 lease_comment_id=6400038608 v=1 -->\n\n<!-- clawsweeper-review item=183700 -->",
+      "createdAt": "2026-10-25T16:20:42Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/183700#issuecomment-6400086099",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABfYQpJg",
+      "author": {
+        "login": "Speculorum9"
+      },
+      "authorAssociation": "NONE",
+      "body": "Thanks for the quick review. Agreed on keeping the Control UI chat eligibility question out of this fix; the broader voice-memory gap is now tracked separately in #183740.",
+      "createdAt": "2026-10-25T17:24:51Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/183700#issuecomment-6400780582",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABgK5aag",
+      "author": {
+        "login": "samvallad33"
+      },
+      "authorAssociation": "NONE",
+      "body": "Hi Rob, two months of a quietly forgetful agent is a long stretch. What finally tipped you off, something specific it should have known? Vestige is the open source memory tool I built for this, it pulls back past conversations on its own and makes it obvious when recall is not running, so a disabled plugin cannot hide. Glad to show you how it works on a personal install. Sam",
+      "createdAt": "2026-10-27T21:21:53Z",
+      "includesCreatedEdit": false,
+      "isMinimized": true,
+      "minimizedReason": "SPAM",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/183700#issuecomment-6453877354",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-10-25T16:13:27Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjhJnjw",
+      "name": "impact:session-state",
+      "description": "Session, memory, transcript, context, or agent state can drift or corrupt.",
+      "color": "F9D65C"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACqFVeuw",
+      "name": "impact:ux-friction",
+      "description": "User-facing flow adds avoidable confusion or support burden without fully blocking progress.",
+      "color": "FBCA04"
+    }
+  ],
+  "number": 183700,
+  "state": "OPEN",
+  "title": "[Bug]: rememberAcrossConversations is on by default, but its required Active Memory plugin is disabled by default, so cross-conversation recall silently does nothing",
+  "updatedAt": "2026-10-30T02:58:29Z",
+  "url": "https://github.com/openclaw/openclaw/issues/183700",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": [
+    {
+      "headRefOid": "30b9fb5ff40de17ce9b0783e8ad84fd86541c990",
+      "mergedAt": null,
+      "number": 183729,
+      "state": "OPEN",
+      "url": "https://github.com/openclaw/openclaw/pull/183729"
+    }
+  ]
+}

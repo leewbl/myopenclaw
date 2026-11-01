@@ -1,0 +1,94 @@
+{
+  "body": "For one successful native child run, the reply returned through `agent.wait` can differ from the result delivered to its parent. In a 13-character example, one path inserts a newline and the other preserves a space. A caller checking that the parent faithfully reported the child's answer then rejects the correct reply.\n\n**Reproduction.** Use one completed assistant message with two distinct final text items: `\"River \"` and `\"stones.\"`. Bind that message to one child run as its visible final. Run it through both the [native terminal reply producer](https://github.com/openclaw/openclaw/blob/f25a10e929c2c0875b6d3a6f6e6a2936726af520/src/agents/embedded-agent-runner/run/attempt-result.ts#L148) and the [parent's completion-result reader](https://github.com/openclaw/openclaw/blob/f25a10e929c2c0875b6d3a6f6e6a2936726af520/src/agents/subagents/announce/subagent-announce-result.ts#L34). Give the requester a public reply that copies the delivered result.\n\n| Child's final content | Terminal reply (JSON string) | Result delivered to parent | Handoff check |\n|---|---|---|---|\n| One text block, or two stream deltas assembled into one block | `\"River stones.\"` | `\"River stones.\"` | Pass |\n| Two distinct final text items | `\"River\\nstones.\"` | `\"River stones.\"` | Fail |\n\nBoth paths selected the same run and final message. In the failing case, the [handoff checker](https://github.com/openclaw/openclaw/blob/f25a10e929c2c0875b6d3a6f6e6a2936726af520/extensions/qa-lab/src/subagent-handoff-reply.ts#L15) returns before it even reads the requester's transcript: no public reply has the spelling it expects. The expected behavior is that a caller can verify this short, untruncated result for the same child. Treating arbitrary whitespace as equivalent would lose information; dropping the run, public-entry, or branch checks would accept the wrong evidence.\n\n**Evidence and scope.** Reproduced locally on Ubuntu 24.04 / Node 24.20 with the production text producers, run-bound final-message selector, wait projection, and checker from `f25a10e9`. The storage and public-reply envelopes were synthetic; no live provider or Gateway was invoked. The relevant producer and checker files were unchanged at `47eaf429`. This is distinct from a long answer hitting the 4,096-unit limit. The [October 22 live job](https://github.com/openclaw/openclaw/actions/runs/39724512539/job/119647320029) did not retain the child's block structure or the exact two values compared at timeout, so this reproduction does **not** establish the cause of that run.\n",
+  "closedByPullRequestsReferences": [],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABeZHn5g",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nThis issue identifies a current-source defect: the same multipart child answer renders differently in agent.wait and parent settlement, causing a valid handoff to fail verification.\n\nReproducibility: Current source deterministically renders [\"River \", \"stones.\"] as \"River\\nstones.\" for the terminal snapshot and \"River stones.\" for parent settlement; this review ran no tests or live Gateway.\n\n**Next step**\nAlign native completion rendering and establish a failing regression comparing agent.wait with parent settlement for the same two-block final.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nUse one consistent visible-answer rendering contract for native terminal snapshots and full parent completion results.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent source deterministically renders [\"River \", \"stones.\"] as \"River\\nstones.\" for the terminal snapshot and \"River stones.\" for parent settlement; this review ran no tests or live Gateway.\n\nIs this the best way to solve the issue?\n\nAlign the production rendering paths while preserving native part boundaries, complete-answer recovery, and strict handoff identity checks; whitespace-insensitive comparison would conceal the defect.\n\nAGENTS.md: found and applied where relevant.\n\nRemaining risk / open question:\n\n- The reported live-job timeout lacks retained block structure and compared values, so its connection to this defect remains unproven.\n\nCodex review notes: model internal, reasoning medium; reviewed against [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `P2`: A deterministic multipart-answer inconsistency breaks handoff verification, with no established widespread outage or urgent regression.\n- add `impact:session-state`: Two projections of the same completed child run expose different answer text.\n- add `issue-rating: 🦞 diamond lobster`: Current issue advisory state selects this label.\n- add `clawsweeper:source-repro`: Current issue advisory state selects this label.\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n\nLabel justifications:\n\n- `P2`: A deterministic multipart-answer inconsistency breaks handoff verification, with no established widespread outage or urgent regression.\n- `impact:session-state`: Two projections of the same completed child run expose different answer text.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- pnpm test src/agents/embedded-agent-runner/run/attempt-result.test.ts --maxWorkers=1\n- pnpm test src/agents/subagents/announce/subagent-announce-result.test.ts --maxWorkers=1\n- pnpm test src/agents/tools/chat-history-text.test.ts --maxWorkers=1\n- pnpm test extensions/qa-lab/src/subagent-handoff.test.ts --maxWorkers=1\n- git diff --check\n\nWhat I checked:\n\n- **Terminal rendering inserts separators:** prepareTerminalAssistantReply uses prepareAssistantVisibleText; its renderer trims individual parts and inserts newlines between adjacent text blocks, producing River\\nstones. for the reported input. ([`src/agents/embedded-agent-utils.ts:155`](https://github.com/openclaw/openclaw/blob/ad407430c464737eec754309c7a6c40ef0d786ca/src/agents/embedded-agent-utils.ts#L155), [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca))\n- **Settlement renders the stored answer differently:** readSubagentRunAnnounceResultUsing selects the run-bound visible final and calls extractStoredAssistantText, which concatenates selected blocks without separators, producing River stones. ([`src/agents/tools/chat-history-text.ts:38`](https://github.com/openclaw/openclaw/blob/ad407430c464737eec754309c7a6c40ef0d786ca/src/agents/tools/chat-history-text.ts#L38), [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca))\n- **Wait projection preserves the mismatch:** projectAgentJobObservation forwards snapshot.terminalReply directly, so agent.wait does not reconcile its text with the transcript rendering. ([`src/gateway/agent-turn/agent-job.ts:637`](https://github.com/openclaw/openclaw/blob/ad407430c464737eec754309c7a6c40ef0d786ca/src/gateway/agent-turn/agent-job.ts#L637), [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca))\n- **Checker rejects a faithfully copied settlement:** The handoff checker derives its expected result from the terminal reply and returns before reading the requester transcript when no public result matches that spelling. ([`extensions/qa-lab/src/subagent-handoff-reply.ts:44`](https://github.com/openclaw/openclaw/blob/ad407430c464737eec754309c7a6c40ef0d786ca/extensions/qa-lab/src/subagent-handoff-reply.ts#L44), [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca))\n- **Separate tests preserve conflicting contracts:** Attempt-result tests explicitly expect newline-separated native parts, while chat-history tests explicitly expect adjacent blocks to concatenate without separators; neither compares both producers for one child final. ([`src/agents/embedded-agent-runner/run/attempt-result.test.ts:169`](https://github.com/openclaw/openclaw/blob/ad407430c464737eec754309c7a6c40ef0d786ca/src/agents/embedded-agent-runner/run/attempt-result.test.ts#L169), [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca))\n- **Documented completion contract:** The subagent announcement contract promises the completed run's complete visible final answer, with small answers intact: https://docs.openclaw.ai/tools/subagents/announce. ([`docs/tools/subagents/announce.md:152`](https://docs.openclaw.ai/tools/subagents/announce), [ad407430c464](https://github.com/openclaw/openclaw/commit/ad407430c464737eec754309c7a6c40ef0d786ca))\n\nLikely related people:\n\n- **Free Wortley:** Raw commit e738c1467779af8e455ef41e8081cf10fa3c164c adds extensions/qa-lab/src/subagent-handoff-reply.ts:18 relative to its recorded parents. This identifies author metadata, not feature responsibility or a PR merger. (role: source-line author; confidence: high; commits: [e738c1467779](https://github.com/openclaw/openclaw/commit/e738c1467779af8e455ef41e8081cf10fa3c164c); files: `extensions/qa-lab/src/subagent-handoff-reply.ts`)\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 22, 2026, 2:44 AM ET / 06:44 UTC._\n\n<!-- clawsweeper-review-version item=180379 reviewed_at=2026-10-22T06:44:29.419Z sha=na source_revision=25541cdd9ea1528be16bf0f8b13fff7f25e2b15fb0c2590e864f1a5ec1ee475c lease_owner=github-run-39735370643-1 lease_comment_id=6334503514 v=1 -->\n\n<!-- clawsweeper-review item=180379 -->",
+      "createdAt": "2026-10-22T06:45:10Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/180379#issuecomment-6334572518",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABeaOqcg",
+      "author": {
+        "login": "matthematics1137"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "I'm investigating this and preparing a focused fix that shares the native final-answer rendering between terminal evidence and parent completion results. I'll preserve run/branch identity checks and full-answer recovery, and add a regression using the same two-block final through both production paths.\n",
+      "createdAt": "2026-10-22T07:56:17Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/180379#issuecomment-6335736434",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-10-22T06:37:40Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjhJnjw",
+      "name": "impact:session-state",
+      "description": "Session, memory, transcript, context, or agent state can drift or corrupt.",
+      "color": "F9D65C"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    }
+  ],
+  "number": 180379,
+  "state": "OPEN",
+  "title": "[Bug]: agent.wait and parent settlement render the same short child reply differently",
+  "updatedAt": "2026-10-22T07:56:18Z",
+  "url": "https://github.com/openclaw/openclaw/issues/180379",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": []
+}

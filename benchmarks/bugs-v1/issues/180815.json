@@ -1,0 +1,100 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nIn the chat view, the forward Tab order goes through every focusable control in the loaded transcript, starting from the oldest loaded message, before reaching the composer. With a long session that is 126 tab stops in the currently loaded history alone. There is no skip target for the composer.\n\n### Steps to reproduce\n\n1. Open a long chat session in the Control UI (e.g. `/chat/main` with a few days of history).\n2. Reload the page and press Tab repeatedly from the top.\n3. Observe: skip link → sidebar toggle → workspace actions → session rename/owner/side panel/session actions → transcript region → then each message's controls (Copy, Apri, attachments, tool-call disclosures…) from the oldest loaded message onward.\n4. Count the stops before the composer.\n\n### Expected behavior\n\nA keyboard user can reach the composer in a few keystrokes, e.g. a \"Skip to message composer\" link, a keyboard shortcut announced via `aria-keyshortcuts`, or the transcript exposed as a single tab stop with arrow-key navigation inside (roving tabindex).\n\n### Actual behavior\n\n126 focusable elements inside the transcript (`[role=log]`) in the loaded history before the composer; the number grows as more history loads. Shift+Tab from the top wraps to the composer area in about 4–6 stops, which works but is not discoverable. \"Vai al contenuto principale\" (\"Skip to main content\") moves focus to `#control-ui-main` (the whole main area), not to the composer.\n\n### OpenClaw version\n\n2026.10.5 (1b58cb9)\n\n### Operating system\n\nmacOS 27.0.1 (26A434)\n\n### Install method\n\nnpm global, Gateway via LaunchAgent; Control UI at http://127.0.0.1:18789\n\n### Model\n\nanthropic/claude-sonnet-4-6\n\n### Provider / routing chain\n\nopenclaw → anthropic (api key)\n\n### Additional provider/model setup details\n\n_No response_\n\n### Logs\n\n```shell\n\n```\n\n### Screenshots, recordings, and evidence\n\nfocus sequence recorded via `document.activeElement` after each Tab; count from `[role=log]` focusable descendants (button, a[href], [tabindex≥0], textarea, input).\n\n### Impact and severity\n\nAffected: keyboard-only and screen-reader users. Severity: annoying, no workaround except Shift+Tab. Frequency: always, worse with longer sessions.\n\n### Additional information\n\nBrowser: Comet 155.0.8059.40 (Chromium). UI locale: Italian. Related: #154524 (message headings for screen reader navigation), #127321.\n\nReported during Focus Week 10/19–10/25 \"Get the Controls Under Control\".",
+  "closedByPullRequestsReferences": [],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABek8PEg",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nKeep open: current main still lacks a discoverable way to bypass transcript controls and reach the composer, and the related accessibility work addresses different behavior.\n\nReproducibility: Current source establishes the missing bypass and transcript-before-composer order; the reporter supplies an official-release keyboard sequence, but this review performed no live reproduction or independent tab-stop count.\n\n**Next step**\nAdd a discoverable composer bypass and first establish a failing browser regression showing that keyboard users cannot skip a long transcript.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nAdd a localized, focus-visible composer skip action before the transcript using the current pane's existing composer focus operation.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent source establishes the missing bypass and transcript-before-composer order; the reporter supplies an official-release keyboard sequence, but this review performed no live reproduction or independent tab-stop count.\n\nIs this the best way to solve the issue?\n\nA small composer skip action directly addresses the navigation gap while preserving access to transcript controls; replacing the transcript with roving focus would require a substantially broader interaction redesign.\n\nAGENTS.md: found and applied where relevant.\n\nRemaining risk / open question:\n\n- The reported 126 tab stops and assistive-technology behavior were not independently reproduced in a browser.\n\nCodex review notes: model internal, reasoning medium; reviewed against [33baeed599ee](https://github.com/openclaw/openclaw/commit/33baeed599ee2922d6fafeaa209c322e1fa621c3).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `P2`: Long histories impose substantial keyboard navigation effort, but the composer remains reachable and no first-run or recovery flow is blocked.\n- add `impact:ux-friction`: Keyboard users must traverse transcript controls or discover an indirect workaround before composing.\n- add `issue-rating: 🦞 diamond lobster`: Current issue advisory state selects this label.\n- add `clawsweeper:source-repro`: Current issue advisory state selects this label.\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n\nLabel justifications:\n\n- `P2`: Long histories impose substantial keyboard navigation effort, but the composer remains reachable and no first-run or recovery flow is blocked.\n- `impact:ux-friction`: Keyboard users must traverse transcript controls or discover an indirect workaround before composing.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- pnpm --dir ui test src/app/app-shell-view.test.ts src/pages/chat/chat-view.test.ts\n- pnpm test:ui:e2e ui/src/e2e/chat-flow.composer-shortcuts.e2e.test.ts\n- pnpm ui:i18n:baseline\n- pnpm ui:i18n:verify\n- git diff --check\n\nWhat I checked:\n\n- **Existing skip destination:** The shell provides a Skip to main content link targeting control-ui-main, which contains the entire route rather than the composer. ([`ui/src/app/app-shell-view.tsx:126`](https://github.com/openclaw/openclaw/blob/33baeed599ee2922d6fafeaa209c322e1fa621c3/ui/src/app/app-shell-view.tsx#L126), [33baeed599ee](https://github.com/openclaw/openclaw/commit/33baeed599ee2922d6fafeaa209c322e1fa621c3))\n- **Transcript precedes composer:** The chat view renders the transcript surface before the footer composer, and the transcript is itself a tab stop without a composer-bypass handler. ([`ui/src/pages/chat/chat-view.tsx:645`](https://github.com/openclaw/openclaw/blob/33baeed599ee2922d6fafeaa209c322e1fa621c3/ui/src/pages/chat/chat-view.tsx#L645), [33baeed599ee](https://github.com/openclaw/openclaw/commit/33baeed599ee2922d6fafeaa209c322e1fa621c3))\n- **Existing keyboard alternatives:** Printable-key handling can focus the composer from eligible noninteractive targets, while the textarea advertises send shortcuts; neither supplies a discoverable forward-Tab bypass. ([`ui/src/pages/chat/chat-pane-shared.ts:205`](https://github.com/openclaw/openclaw/blob/33baeed599ee2922d6fafeaa209c322e1fa621c3/ui/src/pages/chat/chat-pane-shared.ts#L205), [33baeed599ee](https://github.com/openclaw/openclaw/commit/33baeed599ee2922d6fafeaa209c322e1fa621c3))\n- **Related work remains distinct:** https://github.com/openclaw/openclaw/issues/154524 and its open implementation https://github.com/openclaw/openclaw/pull/154962 concern sender headings; https://github.com/openclaw/openclaw/issues/127321 concerns message-menu navigation; https://github.com/openclaw/openclaw/issues/180814 concerns the transcript's accessible name.\n- **Canonical and ownership search:** Live comments and timeline contain no linked implementation or maintainer decision for this issue; searches across issue and PR titles for composer keyboard navigation, composer focus, and chat skipping established no canonical duplicate or open composer-bypass fix.\n- **Feature history and routing:** History across current transcript files and earlier chat-thread modules shows repeated Solid and focus-lifecycle refactors by steipete and conversation presentation work by vyctorbrzezowski; GitHub commit patches verify surviving authored lines, but unavailable historical blobs leave the original Tab-order introduction unknown. ([`ui/src/pages/chat/components/chat-thread-view.tsx:188`](https://github.com/openclaw/openclaw/blob/33baeed599ee2922d6fafeaa209c322e1fa621c3/ui/src/pages/chat/components/chat-thread-view.tsx#L188), [33baeed599ee](https://github.com/openclaw/openclaw/commit/33baeed599ee2922d6fafeaa209c322e1fa621c3))\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 22, 2026, 1:25 PM ET / 17:25 UTC._\n\n<!-- clawsweeper-review-version item=180815 reviewed_at=2026-10-22T17:25:51.185Z sha=na source_revision=403643dce553c58c906d48136b162c4a2e52be2788d2f97b745899d09793a831 lease_owner=github-run-39821812753-1 lease_comment_id=6346863515 v=1 -->\n\n<!-- clawsweeper-review item=180815 -->",
+      "createdAt": "2026-10-22T17:26:30Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/180815#issuecomment-6346968850",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABem6BMg",
+      "author": {
+        "login": "LiuwqGit"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "PR #180917 adds a \"Skip to message composer\" bypass that sits in the forward tab order immediately before the transcript region and moves focus straight to the composer on activation. It reuses the pane-level composer-focus path, stays visually hidden until focused (same pattern as the shell skip link), and is excluded from embedded suggestion composers. Transcript controls remain individually reachable; the bypass only adds one stop before them. Covered by a regression unit test plus a real-Chromium e2e that walks the actual forward tab order and verifies the stop ordering and composer focus; screenshots of the focused states are attached in the PR.",
+      "createdAt": "2026-10-22T19:08:24Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/180815#issuecomment-6349029682",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-10-22T17:18:25Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACqFVeuw",
+      "name": "impact:ux-friction",
+      "description": "User-facing flow adds avoidable confusion or support burden without fully blocking progress.",
+      "color": "FBCA04"
+    }
+  ],
+  "number": 180815,
+  "state": "OPEN",
+  "title": "[Bug]: Control UI chat: keyboard users must Tab through every transcript control before reaching the composer",
+  "updatedAt": "2026-10-22T19:08:24Z",
+  "url": "https://github.com/openclaw/openclaw/issues/180815",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": []
+}

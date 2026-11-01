@@ -1,0 +1,122 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nFocused Control UI unit tests on v2026.9.6 load the same pinned Lit runtime through optimized and native module paths, producing Lit's duplicate-version warning even though the assertions pass.\n\n### Steps to reproduce\n\n1. Install the official v2026.9.6 source with Node v24.21.0 and pnpm v12.4.0.\n2. Run:\n```sh\nOPENCLAW_VITEST_MAX_WORKERS=1 node scripts/run-vitest.mjs run --config test/vitest/vitest.ui.config.ts ui/src/pages/usage/view.test.ts\n```\n3. Observe the same result with `test/vitest/vitest.ui-isolated.config.ts` and the same test file.\n\n### Expected behavior\n\nThe focused UI test should complete without Lit's duplicate-version warning and resolve all Lit imports to one module identity.\n\n### Actual behavior\n\nAll 33 assertions pass, but stderr reports: `Multiple versions of Lit loaded. Loading multiple versions is not recommended.` A trace records one optimized `node_modules/.vite/vitest/.../deps/lit-html-*.js` module and one native `node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/node/development/lit-html.js` module.\n\n### OpenClaw version\n\nv2026.9.6\n\n### Operating system\n\nmacOS ARM64 (Apple Silicon)\n\n### Install method\n\nOfficial v2026.9.6 source archive with isolated Node v24.21.0\n\n### Model\n\nNOT_ENOUGH_INFO\n\n### Provider / routing chain\n\nNOT_ENOUGH_INFO\n\n### Additional provider/model setup details\n\nNOT_ENOUGH_INFO\n\n### Logs\n\n```shell\nRUN  v5.0.0\n\nstderr | ui/src/pages/usage/view.test.ts\nMultiple versions of Lit loaded. Loading multiple versions is not recommended.\n\nTest Files  1 passed (1)\nTests  33 passed (33)\n\nTrace: the optimized `node_modules/.vite/vitest/.../deps/lit-html-*.js` and native `node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/node/development/lit-html.js` each register version 3.3.3.\n```\n\n### Screenshots, recordings, and evidence\n\nNo screenshot required. The module-resolution trace is included in Logs.\n\n### Impact and severity\n\nAffected systems: strict upgrade rehearsals that require warning-free test output. Severity: blocks release acceptance under that policy. Frequency: observed on every focused run using both canonical shared and isolated UI configurations. Consequence: the release rehearsal remains blocked pending a module-resolution fix.\n\n### Additional information\n\nThere is one physical `lit@3.3.3` installation: all nested package links resolve to the same pnpm store directory. Disabling the JSDOM dependency optimizer produces one native Lit module load and no duplicate-version warning, but that is not accepted as the canonical test configuration. Candidate areas: `jsdomOptimizedDeps.optimizer.client.include` and Vitest's external module runner.",
+  "closedByPullRequestsReferences": [
+    {
+      "id": "PR_kwDOQb6kR88AAAABHtyEmw",
+      "number": 168524,
+      "repository": {
+        "id": "R_kgDOQb6kRw",
+        "name": "openclaw",
+        "owner": {
+          "id": "O_kgDODxG9fw",
+          "login": "openclaw"
+        }
+      },
+      "url": "https://github.com/openclaw/openclaw/pull/168524"
+    }
+  ],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABXSpIWQ",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work. _Reviewed September 27, 2026, 1:15 PM ET / 17:15 UTC._\n\n**Summary**\nThe reported warning remains actionable. Current `main` still passes the same Lit optimizer setting to both named UI test configurations, and the supplied module trace identifies two load paths for Lit 3.3.3. The related items supplied with this review address different problems.\n\nReproducibility: yes. the reporter supplied an exact focused command and module trace, and current `main` retains the relevant optimizer path. This read-only review did not execute a current-main run.\n\n**Next step**\nThe report gives a focused failing output and current source identifies one shared configuration owner with two affected UI test paths.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nUnify Lit resolution at the shared Vitest dependency owner, then verify warning-free runs under both UI configurations without masking the warning or splitting Lit's runtime identity.\n\nDo we have a high-confidence way to reproduce the issue?\n\nYes: the reporter supplied an exact focused command and module trace, and current `main` retains the relevant optimizer path. This read-only review did not execute a current-main run.\n\nIs this the best way to solve the issue?\n\nYes, a repair in the shared Vitest dependency configuration is the narrowest likely path; the worker must confirm the module identity at the real test entry point before choosing the configuration change.\n\nAGENTS.md: found and applied where relevant.\n\nCodex review notes: model internal, reasoning medium; reviewed against [3d62d4e2a5e1](https://github.com/openclaw/openclaw/commit/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `P2`: A reproducible warning affects focused UI test output and a reported release rehearsal, while assertions and product runtime still pass.\n- add `impact:other`: The reported duplicate module load reduces test-output reliability and blocks warning-free acceptance checks.\n- add `issue-rating: 🦞 diamond lobster`: Current issue advisory state selects this label.\n- add `clawsweeper:source-repro`: Current issue advisory state selects this label.\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n\nLabel justifications:\n\n- `P2`: A reproducible warning affects focused UI test output and a reported release rehearsal, while assertions and product runtime still pass.\n- `impact:other`: The reported duplicate module load reduces test-output reliability and blocks warning-free acceptance checks.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- OPENCLAW_VITEST_MAX_WORKERS=1 node scripts/run-vitest.mjs run --config test/vitest/vitest.ui.config.ts ui/src/pages/usage/view.test.ts\n- OPENCLAW_VITEST_MAX_WORKERS=1 node scripts/run-vitest.mjs run --config test/vitest/vitest.ui-isolated.config.ts ui/src/pages/usage/view.test.ts\n- node scripts/run-vitest.mjs test/vitest-ui-package-config.test.ts\n\nWhat I checked:\n\n- **Reported reproduction:** The issue supplies an exact v2026.9.6 command, reports 33 passing assertions, and traces Lit 3.3.3 through optimized and native module paths. The reviewer did not execute the command on current main.\n- **Current optimizer setting:** The JSDOM dependency optimizer is enabled and includes `lit/**`; its comment says Lit root and directives should share internals. ([`test/vitest/vitest.shared.config.ts:39`](https://github.com/openclaw/openclaw/blob/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e/test/vitest/vitest.shared.config.ts#L39), [3d62d4e2a5e1](https://github.com/openclaw/openclaw/commit/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e))\n- **Affected test configurations:** The shared and isolated UI configurations both pass the shared JSDOM optimization setting into their scoped Vitest configuration. ([`test/vitest/vitest.ui.config.ts:23`](https://github.com/openclaw/openclaw/blob/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e/test/vitest/vitest.ui.config.ts#L23), [3d62d4e2a5e1](https://github.com/openclaw/openclaw/commit/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e))\n- **Isolated configuration:** The isolated UI configuration uses the same dependency setting. ([`test/vitest/vitest.ui-isolated.config.ts:16`](https://github.com/openclaw/openclaw/blob/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e/test/vitest/vitest.ui-isolated.config.ts#L16), [3d62d4e2a5e1](https://github.com/openclaw/openclaw/commit/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e))\n- **Test entry point:** The named focused test imports Lit's renderer; the view under test also imports Lit. ([`ui/src/pages/usage/view.test.ts:3`](https://github.com/openclaw/openclaw/blob/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e/ui/src/pages/usage/view.test.ts#L3), [3d62d4e2a5e1](https://github.com/openclaw/openclaw/commit/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e))\n- **Feature-history routing:** Recent history of the shared UI test configurations includes test infrastructure work by Peter Steinberger and Vitest migration work by Vincent Koc. The unavailable older source blobs prevent a verified introduction claim. ([`test/vitest/vitest.shared.config.ts`](https://github.com/openclaw/openclaw/blob/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e/test/vitest/vitest.shared.config.ts), [3d62d4e2a5e1](https://github.com/openclaw/openclaw/commit/3d62d4e2a5e112bb0a558fa4ff1dca723074be1e))\n\nLikely related people:\n\n- **Peter Steinberger:** Suggested for follow-up; no historical authorship or introduction is verified. (role: unverified routing candidate; confidence: low)\n- **Vincent Koc:** Suggested for follow-up; no historical authorship or introduction is verified. (role: unverified routing candidate; confidence: low)\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge.\n- Maintainer-only repair and merge flows require explicit commands such as `@clawsweeper autofix`, `@clawsweeper automerge`, `@clawsweeper fix ci`, or `@clawsweeper address review`.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n<!-- clawsweeper-review-version item=159790 reviewed_at=2026-09-27T17:15:18.319Z sha=na source_revision=333bdbbf3ba7f6be1194a2aae35fa50d0312cce887afb1cffffa97675ea402ec lease_owner=github-run-36335981651-1 lease_comment_id=5857995258 v=1 -->\n\n<!-- clawsweeper-review item=159790 -->",
+      "createdAt": "2026-09-27T17:16:16Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/159790#issuecomment-5858019417",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABXSp_Iw",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "<!-- clawsweeper-command-status:159790:implement_issue:auto -->\n🦞⚠️\nAutomatic implementation stopped before completion.\nReason: The automatic implementation worker stopped before all deterministic gates completed. Open the workflow run for the exact blocker.\nWorker: https://github.com/openclaw/clawsweeper/actions/runs/36336436997",
+      "createdAt": "2026-09-27T17:18:10Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/159790#issuecomment-5858033443",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-09-27T17:08:40Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACklv8uw",
+      "name": "impact:other",
+      "description": "This issue has meaningful maintainer-visible impact outside the owned taxonomy.",
+      "color": "C5DEF5"
+    }
+  ],
+  "number": 159790,
+  "state": "OPEN",
+  "title": "[Bug]: Vitest UI tests load Lit twice through optimized and native paths",
+  "updatedAt": "2026-09-27T17:21:26Z",
+  "url": "https://github.com/openclaw/openclaw/issues/159790",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": [
+    {
+      "headRefOid": "3fd45e68e8e258c21a1c54e41018b7b6beac031e",
+      "mergedAt": null,
+      "number": 168524,
+      "state": "OPEN",
+      "url": "https://github.com/openclaw/openclaw/pull/168524"
+    }
+  ]
+}

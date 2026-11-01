@@ -1,0 +1,122 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nWhen sessions_spawn is given a model that is not in `agents.defaults.modelPolicy.allow` (or the agent's own `modelPolicy.allow`), the user-facing error is:\n\n    sessions_spawn model \"provider/model\" is not usable: model not allowed: provider/model\n\nIt does not say why the model is disallowed or how to fix it. The `/model` override path, by contrast, already produces guidance that names the exact config key and accepted shapes (see docs: \"Model override ... is not allowed by agents.defaults.modelPolicy.allow. Add \"provider/model\", \"provider/*\", ... or remove/empty the list\"). The spawn path just didn't get the same treatment.\n\n### Steps to reproduce\n\n1. Configure a model provider with a new model id, but keep `agents.defaults.modelPolicy.allow` limited to other models.\n2. Ask the agent to spawn a subagent pinned to the new model (`sessions_spawn` with `model` set).\n3. Observe: `sessions_spawn model \"provider/new-model\" is not usable: model not allowed: provider/new-model` — no mention of `modelPolicy.allow`.\n\n### Expected behavior\n\nThe error should point at the config key and the fix, consistent with the `/model` path, e.g.:\n\n    sessions_spawn model \"provider/new-model\" is not usable: model not allowed: provider/new-model.\n    Add it to agents.defaults.modelPolicy.allow (or this agent's modelPolicy.allow), or use a model already in that list.\n\n### Actual behavior\n\n`model not allowed: X` with no remediation hint. Users must search docs/source to discover `modelPolicy.allow`.\n\nSource locations (main @ 785358c1a31266da58215a651fdd0f62bb539051)\n- `src/agents/model-selection-shared.ts:1075-1077` — returns `model not allowed: ${status.key}` with no guidance.\n- `src/agents/subagents/spawn/subagent-spawn-plan.ts:113-118` — wraps it as `... is not usable: ${choice.error}`.\n- Contrast: the `/model` override path already surfaces the allowlist remediation text (documented in workspace-and-bootstrap).\n\nSuggested fix\nAppend the remediation sentence in `subagent-spawn-plan.ts` (or in the shared `model-selection-shared.ts` message so all callers benefit). Pure string change + one unit test asserting the error contains `modelPolicy.allow`. \n\nRelated work — intentionally not touched:\n- #120183 (closed, fixed by #125931): moved rejection *before* child creation — timing is already correct; this report is only about message content.\n- #120185 (open PR): admission semantics for subagent model rejection — this report does not change admission behavior.\n\n### OpenClaw version\n\n2026.10.7 (main @ 785358c1a31266da58215a651fdd0f62bb539051)\n\n### Operating system\n\nDebian 12 (bookworm), x64\n\n### Install method\n\nnpm global (Node v24.20.0, prefix /usr/local/node24)\n\n### Model\n\nzai/glm-5.3-flash\n\n### Provider / routing chain\n\nHappy to submit this as a small PR (string change + test) if maintainers prefer that over an issue.\n\n### Additional provider/model setup details\n\n_No response_\n\n### Logs\n\n```shell\n\n```\n\n### Screenshots, recordings, and evidence\n\n_No response_\n\n### Impact and severity\n\n_No response_\n\n### Additional information\n\n_No response_",
+  "closedByPullRequestsReferences": [
+    {
+      "id": "PR_kwDOQb6kR88AAAABK6twfg",
+      "number": 185332,
+      "repository": {
+        "id": "R_kgDOQb6kRw",
+        "name": "openclaw",
+        "owner": {
+          "id": "O_kgDODxG9fw",
+          "login": "openclaw"
+        }
+      },
+      "url": "https://github.com/openclaw/openclaw/pull/185332"
+    }
+  ],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABf2CxjQ",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nKeep open: current main still omits policy-repair guidance from rejected spawn requests, and the related admission fixes do not address this error-message gap.\n\nReproducibility: Current source establishes the complete rejection path, and the model-choice test explicitly expects the reported terse error; no runtime reproduction or tests were executed during this read-only review.\n\n**Next step**\nAdd policy-scoped remediation to the shared rejection and establish a failing spawn regression that checks the effective repair key and absence of child creation.\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nReturn policy-specific repair guidance from the shared rejection owner using the target agent's existing policy-path resolver.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent source establishes the complete rejection path, and the model-choice test explicitly expects the reported terse error; no runtime reproduction or tests were executed during this read-only review.\n\nIs this the best way to solve the issue?\n\nA shared, policy-aware diagnostic is preferable to appending generic advice in the spawn wrapper because the existing resolver can identify the effective default, per-agent, or legacy repair path.\n\nAGENTS.md: found and applied where relevant.\n\nCodex review notes: model internal, reasoning medium; reviewed against [173c8537d5ae](https://github.com/openclaw/openclaw/commit/173c8537d5ae4ea1da4200ba59da584b76bb5600).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\n- add `P3`: The policy correctly rejects the request; the defect is a bounded diagnostic omission in an advanced model-override workflow.\n- add `impact:ux-friction`: The error leaves users to discover the governing configuration key and recovery steps elsewhere.\n- add `issue-rating: 🦞 diamond lobster`: Current issue advisory state selects this label.\n- add `clawsweeper:source-repro`: Current issue advisory state selects this label.\n- add `clawsweeper:queueable-fix`: Current issue advisory state selects this label.\n- add `clawsweeper:fix-shape-clear`: Current issue advisory state selects this label.\n\nLabel justifications:\n\n- `P3`: The policy correctly rejects the request; the defect is a bounded diagnostic omission in an advanced model-override workflow.\n- `impact:ux-friction`: The error leaves users to discover the governing configuration key and recovery steps elsewhere.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- node scripts/run-vitest.mjs src/agents/model-selection-resolve.test.ts src/agents/model-selection.test.ts src/agents/model-runtime-choice.test.ts src/agents/subagents/spawn/subagent-spawn.test.ts\n- node scripts/run-vitest.mjs src/auto-reply/reply/model-selection-directive.test.ts src/auto-reply/reply/directive-handling.model.test.ts\n- pnpm tsgo:core\n- pnpm exec oxlint src/agents/model-selection-shared.ts src/agents/model-selection-resolve.test.ts src/agents/model-runtime-choice.test.ts src/agents/subagents/spawn/subagent-spawn.test.ts\n- pnpm exec oxfmt --check src/agents/model-selection-shared.ts src/agents/model-selection-resolve.test.ts src/agents/model-runtime-choice.test.ts src/agents/subagents/spawn/subagent-spawn.test.ts\n\nWhat I checked:\n\n- **Current rejection omits remediation:** The shared resolver returns only model not allowed plus the resolved model key when policy rejects the selection. ([`src/agents/model-selection-shared.ts:1070`](https://github.com/openclaw/openclaw/blob/173c8537d5ae4ea1da4200ba59da584b76bb5600/src/agents/model-selection-shared.ts#L1070), [173c8537d5ae](https://github.com/openclaw/openclaw/commit/173c8537d5ae4ea1da4200ba59da584b76bb5600))\n- **Real spawn path preserves the terse error:** prepareModelChoice invokes resolveAllowedModelRef for explicit overrides and forwards selected.error; the spawn planner wraps that error without policy guidance, and child planning returns it to the caller. ([`src/agents/model-runtime-choice.ts:105`](https://github.com/openclaw/openclaw/blob/173c8537d5ae4ea1da4200ba59da584b76bb5600/src/agents/model-runtime-choice.ts#L105), [173c8537d5ae](https://github.com/openclaw/openclaw/commit/173c8537d5ae4ea1da4200ba59da584b76bb5600))\n- **Existing tests confirm current error content:** The manual-override policy case expects exactly model not allowed: fixture/new-model; existing spawn coverage separately verifies refusal before child-side effects. ([`src/agents/model-runtime-choice.test.ts:202`](https://github.com/openclaw/openclaw/blob/173c8537d5ae4ea1da4200ba59da584b76bb5600/src/agents/model-runtime-choice.test.ts#L202), [173c8537d5ae](https://github.com/openclaw/openclaw/commit/173c8537d5ae4ea1da4200ba59da584b76bb5600))\n- **Sibling recovery guidance and existing policy owner:** The /model rejection names policy.allowRepairConfigPath and offers an allowed-model discovery command; resolveConfiguredModelPolicyAllow already distinguishes default, per-agent, and legacy repair paths. The documented policy is at https://docs.openclaw.ai/concepts/models. ([`src/auto-reply/reply/model-selection-directive.ts:267`](https://github.com/openclaw/openclaw/blob/173c8537d5ae4ea1da4200ba59da584b76bb5600/src/auto-reply/reply/model-selection-directive.ts#L267), [173c8537d5ae](https://github.com/openclaw/openclaw/commit/173c8537d5ae4ea1da4200ba59da584b76bb5600))\n- **Related work addresses different behavior:** https://github.com/openclaw/openclaw/pull/125931 merged pre-creation validation, rather than remediation wording. In https://github.com/openclaw/openclaw/pull/120185, RomneyDa's follow-up explains that the superseded policy implementation was dropped and the remaining work concerns explicit credential-profile binding; its current diff does not add this guidance.\n- **Feature-history ownership:** Commit 5f17f893af5853e4cbcb679b22b80b2ad7e6c613 introduced the shared prepareModelChoice path and migrated spawn to consume it; GitHub identifies its author as obviyus. Local historical blame and pickaxe encountered unavailable promisor objects, so no introduction claim is made for the older terse error. ([`src/agents/model-runtime-choice.ts:51`](https://github.com/openclaw/openclaw/blob/5f17f893af5853e4cbcb679b22b80b2ad7e6c613/src/agents/model-runtime-choice.ts#L51), [5f17f893af58](https://github.com/openclaw/openclaw/commit/5f17f893af5853e4cbcb679b22b80b2ad7e6c613))\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 26, 2026, 10:09 PM ET / October 27, 2026, 02:09 UTC._\n\n<!-- clawsweeper-review-version item=185317 reviewed_at=2026-10-27T02:09:57.738Z sha=na source_revision=9212bdb9d921b0a59135e62f7687079bab1e8406fa9b67bc5ed7a37ac105fe0b lease_owner=github-run-40436375485-1 lease_comment_id=6431944345 v=1 -->\n\n<!-- clawsweeper-review item=185317 -->",
+      "createdAt": "2026-10-27T02:10:49Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/185317#issuecomment-6432010637",
+      "viewerDidAuthor": false
+    },
+    {
+      "id": "IC_kwDOQb6kR88AAAABf2I2kA",
+      "author": {
+        "login": "Shubham-Padkonde"
+      },
+      "authorAssociation": "NONE",
+      "body": "I'd like to investigate the missing model-policy guidance and add regression coverage for the effective configuration path and rejection before child creation",
+      "createdAt": "2026-10-27T02:18:19Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/185317#issuecomment-6432110224",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-10-27T02:02:42Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeTlMQ",
+      "name": "P3",
+      "description": "Low-priority cleanup, docs, polish, ergonomics, or speculative work.",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACqFVeuw",
+      "name": "impact:ux-friction",
+      "description": "User-facing flow adds avoidable confusion or support burden without fully blocking progress.",
+      "color": "FBCA04"
+    }
+  ],
+  "number": 185317,
+  "state": "OPEN",
+  "title": "[Bug]: sessions_spawn \"model not allowed\" error omits the modelPolicy.allow fix guidance that the /model path already provides",
+  "updatedAt": "2026-10-27T02:18:19Z",
+  "url": "https://github.com/openclaw/openclaw/issues/185317",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": [
+    {
+      "headRefOid": "375c7964560ca5671e31f401940a1d3a6162383a",
+      "mergedAt": null,
+      "number": 185332,
+      "state": "OPEN",
+      "url": "https://github.com/openclaw/openclaw/pull/185332"
+    }
+  ]
+}

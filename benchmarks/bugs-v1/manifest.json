@@ -1,0 +1,203 @@
+{
+  "schema_version": 1,
+  "benchmark_id": "openclaw-bugs-v1",
+  "source_repository": "https://github.com/leewbl/myopenclaw",
+  "upstream_repository": "https://github.com/openclaw/openclaw",
+  "source_base_sha": "54710b123fe94a2139930c1d7c038e7623345a5e",
+  "created_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "case_order": [
+    149994,
+    180815,
+    180379,
+    183389,
+    186914,
+    185317,
+    183700,
+    159790,
+    185079,
+    185534
+  ],
+  "total_points": 100,
+  "cases": [
+    {
+      "issue": 149994,
+      "title": "[Bug]: the /approve page's Allow button is white text on a near-white background — it looks like an empty button",
+      "url": "https://github.com/openclaw/openclaw/issues/149994",
+      "snapshot": "issues/149994.json",
+      "snapshot_sha256": "23b0042a842fb7b7c9bf45a99f214eed3eb0eb615671889c5bb5f8dd20dfa4c9",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "Light-theme approval labels remain readable at rest, hover, focus and disabled states; normal text contrast >=4.5:1.",
+        "Dark theme and all existing approval actions retain their behavior; sanitized before/after browser screenshots are required."
+      ],
+      "linked_prs_at_capture": []
+    },
+    {
+      "issue": 180815,
+      "title": "[Bug]: Control UI chat: keyboard users must Tab through every transcript control before reaching the composer",
+      "url": "https://github.com/openclaw/openclaw/issues/180815",
+      "snapshot": "issues/180815.json",
+      "snapshot_sha256": "e608672644e7ae56ffc0808b946b5b06c778b742c673bcffb7b4fd8482b08a52",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "A discoverable keyboard-only bypass reaches the real composer without traversing a long transcript.",
+        "Transcript controls remain keyboard accessible; focus order, embedded composers and narrow layout are covered with browser evidence."
+      ],
+      "linked_prs_at_capture": []
+    },
+    {
+      "issue": 180379,
+      "title": "[Bug]: agent.wait and parent settlement render the same short child reply differently",
+      "url": "https://github.com/openclaw/openclaw/issues/180379",
+      "snapshot": "issues/180379.json",
+      "snapshot_sha256": "e94caa0ae4613c6672e73f6f0e0ab0f79d2b17dd9df4dfad7ce8e7722b93cd7f",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "The same multipart final answer produces identical visible text through agent.wait and parent settlement.",
+        "Preserve run/branch identity checks, whitespace semantics and full-answer recovery; cover empty and single-block siblings."
+      ],
+      "linked_prs_at_capture": []
+    },
+    {
+      "issue": 183389,
+      "title": "[Bug]: Promoted conversation leaves its former parent showing a 21h 57m working indicator",
+      "url": "https://github.com/openclaw/openclaw/issues/183389",
+      "snapshot": "issues/183389.json",
+      "snapshot_sha256": "58830a0efe750729b24cfedfd6d4517110a3cbaf320876a3bb1022476f1d3acd",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "With idle A, promoted B retaining parentSessionKey=A and an active child under B, B is busy and A is idle.",
+        "Ordinary nested children still propagate activity; transcript ancestry and delegated completion delivery remain intact; capture UI evidence."
+      ],
+      "linked_prs_at_capture": []
+    },
+    {
+      "issue": 186914,
+      "title": "[Bug]: Slack delayed sessions_send completion creates a thread for a top-level request (2026.10.8)",
+      "url": "https://github.com/openclaw/openclaw/issues/186914",
+      "snapshot": "issues/186914.json",
+      "snapshot_sha256": "bf672e301e1d0e27ba150913629d0293019bcbca9c790aa2349b20ceb54a9ca4",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "Delayed sessions_send completion from top-level Slack ingress with replyToMode off remains top-level.",
+        "A real explicitly threaded request remains threaded; prove the real route-capture and delayed-delivery boundary; mock-only evidence is insufficient for full credit."
+      ],
+      "linked_prs_at_capture": []
+    },
+    {
+      "issue": 185317,
+      "title": "[Bug]: sessions_spawn \"model not allowed\" error omits the modelPolicy.allow fix guidance that the /model path already provides",
+      "url": "https://github.com/openclaw/openclaw/issues/185317",
+      "snapshot": "issues/185317.json",
+      "snapshot_sha256": "31698bd318119553fe30ae9d3132553a666b146b4f9909548e92567735439234",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "A spawn model-policy rejection identifies the effective default or per-agent configuration key and actionable remediation.",
+        "Rejected requests create no child; allowed-model behavior and rejection authority remain unchanged."
+      ],
+      "linked_prs_at_capture": [
+        {
+          "headRefOid": "375c7964560ca5671e31f401940a1d3a6162383a",
+          "mergedAt": null,
+          "number": 185332,
+          "state": "OPEN",
+          "url": "https://github.com/openclaw/openclaw/pull/185332"
+        }
+      ]
+    },
+    {
+      "issue": 183700,
+      "title": "[Bug]: rememberAcrossConversations is on by default, but its required Active Memory plugin is disabled by default, so cross-conversation recall silently does nothing",
+      "url": "https://github.com/openclaw/openclaw/issues/183700",
+      "snapshot": "issues/183700.json",
+      "snapshot_sha256": "ac0dc981f3115555b3a8e22f3f695ad5e5a58343339d6faefb178c3ad4c3d9d6",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "Doctor reports unavailable Active Memory when personal cross-conversation recall is enabled and the plugin is absent or disabled.",
+        "Explicitly enabled, disabled-recall and per-install configuration siblings behave correctly; diagnose rather than silently enable plugins."
+      ],
+      "linked_prs_at_capture": [
+        {
+          "headRefOid": "30b9fb5ff40de17ce9b0783e8ad84fd86541c990",
+          "mergedAt": null,
+          "number": 183729,
+          "state": "OPEN",
+          "url": "https://github.com/openclaw/openclaw/pull/183729"
+        }
+      ]
+    },
+    {
+      "issue": 159790,
+      "title": "[Bug]: Vitest UI tests load Lit twice through optimized and native paths",
+      "url": "https://github.com/openclaw/openclaw/issues/159790",
+      "snapshot": "issues/159790.json",
+      "snapshot_sha256": "2652b496677e1df546514ea310b2caabdb92674cac4097778fa1c9331c60fbfd",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "Both affected UI test entrypoints load a single pinned Lit runtime without duplicate-runtime warnings.",
+        "Existing assertions remain intact; do not suppress console warnings or skip tests; pin Node, pnpm and dependencies."
+      ],
+      "linked_prs_at_capture": [
+        {
+          "headRefOid": "3fd45e68e8e258c21a1c54e41018b7b6beac031e",
+          "mergedAt": null,
+          "number": 168524,
+          "state": "OPEN",
+          "url": "https://github.com/openclaw/openclaw/pull/168524"
+        }
+      ]
+    },
+    {
+      "issue": 185079,
+      "title": "[Bug]: Codex settled-turn projection rejects valid image-only Telegram history as invalid_content",
+      "url": "https://github.com/openclaw/openclaw/issues/185079",
+      "snapshot": "issues/185079.json",
+      "snapshot_sha256": "f05c323c2052339c77b1bc29a6dc4619c3ed172211771520635ae51ba4466e37",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "Valid persisted image-only user history passes real settled-history capture without invalid_content.",
+        "Invalid content is still rejected; prior-history trimming, current-turn validation and image metadata remain correct."
+      ],
+      "linked_prs_at_capture": [
+        {
+          "headRefOid": "7be8182ab8d7ddef3136706fbc3c3667f5aec4bf",
+          "mergedAt": null,
+          "number": 185186,
+          "state": "OPEN",
+          "url": "https://github.com/openclaw/openclaw/pull/185186"
+        }
+      ]
+    },
+    {
+      "issue": 185534,
+      "title": "[Bug]: cleanSchemaForGemini makes read({ optional }) input schema unsatisfiable in Code Mode / Tool Search",
+      "url": "https://github.com/openclaw/openclaw/issues/185534",
+      "snapshot": "issues/185534.json",
+      "snapshot_sha256": "0b4b791f7b30246147e7ab4a388a00fe19d212505a106d3d2ad04f453416782e",
+      "max_points": 10,
+      "baseline_status": "not_run",
+      "acceptance": [
+        "Gemini-normalized read({path: missing, optional: true}) passes canonical local validation and returns the documented not-found result.",
+        "Provider wire normalization does not corrupt execution schemas or Code Mode declarations; invalid inputs still fail and other literal types remain covered."
+      ],
+      "linked_prs_at_capture": [
+        {
+          "headRefOid": "e889d76561e306aab58c45e8c059280ed2db9c71",
+          "mergedAt": null,
+          "number": 185581,
+          "state": "OPEN",
+          "url": "https://github.com/openclaw/openclaw/pull/185581"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,107 @@
+{
+  "body": "### Bug type\n\nBehavior bug (incorrect output/state without crash)\n\n### Beta release blocker\n\nNo\n\n### Summary\n\nWhen running Code Mode or Tool Search with a Google Gemini model (google/gemini-*), passing the `optional` parameter to the `read` tool always fails local AJV input schema validation regardless of whether boolean `true` or string `\"true\"` is passed, because `cleanSchemaForGemini` mutates `{ type: \"boolean\", const: true }` into the unsatisfiable schema `{ type: \"boolean\", enum: [\"true\"] }` on `tool.parameters`.\n\n### Steps to reproduce\n\n1. Configure an OpenClaw agent using a Google Gemini model (e.g. `google/gemini-3.1-pro-preview`, `google/gemini-3.8-flash`, or `google/gemini-4-argon`) with Code Mode (`exec`) enabled.\n2. Observe the generated Code Mode system prompt signature for `read`: `- read { path: string; cursor?: number /* integer */; limit?: number; offset?: number /* integer */; optional?: \"true\" }`.\n3. Inside a Code Mode `exec` block, call `await read({ path: \"nonexistent.txt\", optional: true })`.\n4. Observe that validation fails with: `Invalid arguments for tool \"openclaw:core:read\": optional: must be equal to \"true\".`\n5. Inside a Code Mode `exec` block, call `await read({ path: \"nonexistent.txt\", optional: \"true\" })`.\n6. Observe that validation fails with: `Invalid arguments for tool \"openclaw:core:read\": optional: must be boolean.\n\n\n### Expected behavior\n\nPer `src/agents/sessions/tools/tool-schemas.ts` (`readToolInputSchema`, lines 94–98), calling `await read({ path: \"nonexistent.txt\", optional: true })` should pass input schema validation and return `{ kind: \"not_found\", optional: true, path: \"nonexistent.txt\", status: \"not_found\" }` instead of throwing an `input_contract` error.\n\n### Actual behavior\n\nBoth `optional: true` and `optional: \"true\"` are rejected before execution by `assertCatalogInputMatchesSchema` (`src/agents/tool-search-runtime.ts` -> `validateJsonSchemaValue`):\n\n- With `optional: true`: `Error: Invalid arguments for tool \"openclaw:core:read\": optional: must be equal to \"true\". Expected input: { path: string; cursor?: number /* integer */; limit?: number; offset?: number /* integer */; optional?: \"true\" }.`\n- With `optional: \"true\"`: `Error: Invalid arguments for tool \"openclaw:core:read\": optional: must be boolean. Expected input: { path: string; cursor?: number /* integer */; limit?: number; offset?: number /* integer */; optional?: \"true\" }.`\n\n\n### OpenClaw version\n\n2026.9.33 (5873f81) (also verified present in upstream main HEAD)\n\n### Operating system\n\nUbuntu 24.04.4 LTS (Linux 6.8.0-147-generic x64)\n\n### Install method\n\nnpm global (with Docker sandbox for Code Mode)\n\n### Model\n\ngoogle/gemini-4-argon (affects all google/gemini-* models)\n\n### Provider / routing chain\n\nopenclaw -> google (direct Gemini API)\n\n### Additional provider/model setup details\n\nAny agent session routed through the `google` provider triggers `cleanSchemaForGemini` during `finalizeAgentTools` -> `normalizeToolParameters`.\n\n### Logs\n\n```shell\nError: Invalid arguments for tool \"openclaw:core:read\": optional: must be equal to \"true\". Expected input: { path: string; cursor?: number /* integer */; limit?: number; offset?: number /* integer */; optional?: \"true\" }. Call tool_describe with exact ToolSearchEntry.id \"openclaw:core:read\" only if you need bounds, enums, defaults, or full schema details.\n\nError: Invalid arguments for tool \"openclaw:core:read\": optional: must be boolean. Expected input: { path: string; cursor?: number /* integer */; limit?: number; offset?: number /* integer */; optional?: \"true\" }. Call tool_describe with exact ToolSearchEntry.id \"openclaw:core:read\" only if you need bounds, enums, defaults, or full schema details.\n```\n\n### Screenshots, recordings, and evidence\n\nRoot cause in upstream `main` source:\n\n1. `src/agents/sessions/tools/tool-schemas.ts` (lines 94–98) defines `optional` as `Type.Optional(Type.Literal(true))` -> `{ type: \"boolean\", const: true }`.\n2. `packages/ai/src/providers/clean-for-gemini.ts` (lines 193–211) converts `const: true` into `enum: [\"true\"]` via `.map(String)` while keeping `type: \"boolean\"`, producing `{ type: \"boolean\", enum: [\"true\"] }`.\n3. `normalizeToolParameters` overwrites `tool.parameters` with this Gemini-cleaned schema before `toCatalogEntry` (`src/agents/tool-search-catalog.ts`) snapshots `entry.parameters`.\n4. `assertCatalogInputMatchesSchema` (`src/agents/tool-search-runtime.ts`, line 138) validates `entry.parameters` with AJV (`validateJsonSchemaValue`), where `{ type: \"boolean\", enum: [\"true\"] }` is unsatisfiable (`typeof x === \"boolean\" && x === \"true\"` is impossible in JSON).\n\n\n### Impact and severity\n\nAffected: All users and agents running Google Gemini models (`google/gemini-*`) with Code Mode (`exec`) or Tool Search.\n\nSeverity: Annoying / degrades workflow (causes repeated tool call failures and wasted turns whenever the model uses `optional` as advertised in the Code Mode prompt).\n\nFrequency: Always (100% reproducible on every `read` call that includes `optional`; observed 13 times across 5 sessions in our 7-day trajectory audit).\n\nConsequence: The model sees `optional?: \"true\"` in its Code Mode prompt, tries `optional: \"true\"` (fails `must be boolean`), retries `optional: true` (fails `must be equal to \"true\"`), and wastes 1–2 extra tool turns before omitting `optional` and wrapping `read({ path })` in `try/catch`.\n\n\n### Additional information\n\nSuggested fix (either or both):\n\n1. In `src/agents/sessions/tools/tool-schemas.ts` (line 95), change `optional` in `readToolInputSchema` from `Type.Optional(Type.Literal(true, ...))` to `Type.Optional(Type.Boolean(...))` (matching `grepSchema.ignoreCase` and `grepSchema.literal` in the same file).\n2. In `src/agents/agent-tools.schema.ts` / `src/agents/tool-search-runtime.ts`, preserve the pre-normalization TypeBox/JSON schema as the execution schema for local AJV validation (`resolveAgentToolExecutionSchema`) and Code Mode type hints (`compactToolInputHint`), so Gemini wire-format workarounds (`enum: [\"true\"]` on `type: \"boolean\"`) are only sent to the Gemini API and do not corrupt local AJV validation for tools using `Type.Literal(true)` (such as `read`, `browser-tool.schema.ts`, and `worker-admission.ts`).\n",
+  "closedByPullRequestsReferences": [
+    {
+      "id": "PR_kwDOQb6kR88AAAABK8scAw",
+      "number": 185581,
+      "repository": {
+        "id": "R_kgDOQb6kRw",
+        "name": "openclaw",
+        "owner": {
+          "id": "O_kgDODxG9fw",
+          "login": "openclaw"
+        }
+      },
+      "url": "https://github.com/openclaw/openclaw/pull/185581"
+    }
+  ],
+  "comments": [
+    {
+      "id": "IC_kwDOQb6kR88AAAABf47vwA",
+      "author": {
+        "login": "clawsweeper"
+      },
+      "authorAssociation": "CONTRIBUTOR",
+      "body": "Codex review: this still needs some work.\n\n**Summary**\nThis issue identifies a current schema-contract defect: Gemini normalization makes read.optional unsatisfiable, and the resulting schema reaches local validation and Code Mode declarations.\n\nReproducibility: Current source establishes the complete failure chain: boolean const true becomes a string enum, finalization publishes it to the catalog, and local validation receives the contradictory schema without a read-specific override; no live reproduction was run.\n\n**Next step**\nPreserve canonical input schemas through finalization and catalog discovery, first establishing a failing regression for Gemini-normalized read({ path: \"nonexistent.txt\", optional: true }).\n\n\n<details>\n<summary>Review details</summary>\n\nBest possible solution:\n\nKeep canonical schemas authoritative for local validation and discovery, with Gemini compatibility projections confined to provider-facing use.\n\nDo we have a high-confidence way to reproduce the issue?\n\nCurrent source establishes the complete failure chain: boolean const true becomes a string enum, finalization publishes it to the catalog, and local validation receives the contradictory schema without a read-specific override; no live reproduction was run.\n\nIs this the best way to solve the issue?\n\nPreserving canonical execution and discovery schemas fixes the shared boundary defect; widening read.optional alone would change its contract and leave other literal-valued tools exposed.\n\nAGENTS.md: found and applied where relevant.\n\nRemaining risk / open question:\n\n- The composed Gemini workflow was not executed during this read-only review; a failing regression and after-fix runtime proof remain necessary.\n\nCodex review notes: model internal, reasoning medium; reviewed against [15c2e6838f1c](https://github.com/openclaw/openclaw/commit/15c2e6838f1cf3e56983e31f6c2b02113b72ca38).\n\n</details>\n\n<details>\n<summary>Label changes</summary>\n\nLabel changes:\n\nNo label changes.\n\nLabel justifications:\n\n- `P2`: Optional reads fail deterministically in affected Gemini workflows, but omitting optional and handling missing-file errors provides a workaround.\n- `impact:other`: Contradictory tool input contracts reject valid calls and advertise unusable arguments, wasting agent turns.\n\n</details>\n\n<details>\n<summary>Evidence reviewed</summary>\n\nAcceptance criteria:\n\n- Establish the composed Gemini optional-read regression red on the base and green after the fix, including Code Mode declarations and descriptor reuse.\n- pnpm test src/agents/tool-search.test.ts src/agents/tool-search-runtime.test.ts src/agents/code-mode.test.ts src/agents/code-mode-tool-api.test.ts src/agents/agent-tools.finalize.test.ts src/agents/agent-tool-availability.test.ts --maxWorkers=1\n- pnpm test packages/ai/src/providers/clean-for-gemini.test.ts src/agents/sessions/tools/read.test.ts src/agents/agent-tools.prefix-stability.test.ts --maxWorkers=1\n- pnpm check:changed\n- Through an isolated Gemini Code Mode session, call read({ path: \"nonexistent.txt\", optional: true }) and verify structured not_found without an input_contract failure.\n\nWhat I checked:\n\n- **Canonical optional-read contract:** readToolInputSchema declares optional as Type.Optional(Type.Literal(true)); the executor returns structured not_found for missing paths, and read tests cover ENOTDIR while preserving permission errors. The documented contract is https://docs.openclaw.ai/tools/code-mode/output. ([`src/agents/sessions/tools/tool-schemas.ts:95`](https://github.com/openclaw/openclaw/blob/15c2e6838f1cf3e56983e31f6c2b02113b72ca38/src/agents/sessions/tools/tool-schemas.ts#L95), [15c2e6838f1c](https://github.com/openclaw/openclaw/commit/15c2e6838f1cf3e56983e31f6c2b02113b72ca38))\n- **Contradictory provider projection:** The cleaner maps const and enum values through String while retaining the declared type, producing type boolean with enum [\"true\"]. Existing cleaner tests intentionally preserve numeric types alongside stringified enums. ([`packages/ai/src/providers/clean-for-gemini.ts:230`](https://github.com/openclaw/openclaw/blob/15c2e6838f1cf3e56983e31f6c2b02113b72ca38/packages/ai/src/providers/clean-for-gemini.ts#L230), [15c2e6838f1c](https://github.com/openclaw/openclaw/commit/15c2e6838f1cf3e56983e31f6c2b02113b72ca38))\n- **Projection replaces tool parameters:** normalizeToolParameters binds the provider-normalized schema as tool.parameters. Google providers select Gemini cleaning in normalizeToolParameterSchema. ([`src/agents/agent-tools.finalize.ts:86`](https://github.com/openclaw/openclaw/blob/15c2e6838f1cf3e56983e31f6c2b02113b72ca38/src/agents/agent-tools.finalize.ts#L86), [15c2e6838f1c](https://github.com/openclaw/openclaw/commit/15c2e6838f1cf3e56983e31f6c2b02113b72ca38))\n- **Catalog validation and discovery consume the projection:** toCatalogEntry copies tool.parameters; input validation uses an availability execution-schema override or that catalog schema. Read has no such override. Code Mode declarations and compact catalog hints also consume entry.parameters. Current validation is TypeBox-backed, rather than the report's AJV description. ([`src/agents/tool-search-runtime.ts:122`](https://github.com/openclaw/openclaw/blob/15c2e6838f1cf3e56983e31f6c2b02113b72ca38/src/agents/tool-search-runtime.ts#L122), [15c2e6838f1c](https://github.com/openclaw/openclaw/commit/15c2e6838f1cf3e56983e31f6c2b02113b72ca38))\n- **Earlier wire compatibility work:** Merged https://github.com/openclaw/openclaw/pull/104567 addressed Gemini rejecting non-string enum entries. Its author supplied provider before/after evidence, and steipete confirmed the squash merge; it does not fix this current local-validation mismatch. ([`packages/ai/src/providers/clean-for-gemini.ts`](https://github.com/openclaw/openclaw/blob/1338b0d0bc2bc105b7a31e93d10c894a4bba9e5e/packages/ai/src/providers/clean-for-gemini.ts), [1338b0d0bc2b](https://github.com/openclaw/openclaw/commit/1338b0d0bc2bc105b7a31e93d10c894a4bba9e5e))\n- **Feature history and ownership:** REST history identifies steipete's repeated descriptor preparation and finalization refactors, including the earlier agent-tools.schema.ts owner, and RomneyDa's schema consolidation. The consolidation carries the optional literal forward and does not establish when the defect began. Some historical blobs were unavailable locally, so REST commit patches supplied history evidence. ([`src/agents/sessions/tools/tool-schemas.ts:96`](https://github.com/openclaw/openclaw/blob/73a2c9791b88f1e42417b08b9b2757ba5fcc5a89/src/agents/sessions/tools/tool-schemas.ts#L96), [73a2c9791b88](https://github.com/openclaw/openclaw/commit/73a2c9791b88f1e42417b08b9b2757ba5fcc5a89))\n\nLikely related people:\n\n- **Dallin Romney:** Raw commit 73a2c9791b88f1e42417b08b9b2757ba5fcc5a89 adds src/agents/sessions/tools/tool-schemas.ts:96 relative to its recorded parents. This identifies author metadata, not feature responsibility or a PR merger. (role: source-line author; confidence: medium; commits: [73a2c9791b88](https://github.com/openclaw/openclaw/commit/73a2c9791b88f1e42417b08b9b2757ba5fcc5a89); files: `src/agents/sessions/tools/tool-schemas.ts`)\n\n</details>\n\n<details>\n<summary>How this review workflow works</summary>\n\n- ClawSweeper keeps one durable marker-backed review comment per issue or PR.\n- Re-runs edit this comment so the latest verdict, findings, and automation markers stay together instead of adding duplicate bot comments.\n- A fresh review can be triggered by eligible `@clawsweeper re-review` comments, exact-item GitHub events, scheduled/background review runs, or manual workflow dispatch.\n- PR/issue authors and users with repository write access can comment `@clawsweeper re-review` or `@clawsweeper re-run` on an open PR or issue to request a fresh review only.\n- Maintainers can also comment `@clawsweeper review` to request a fresh review only.\n- Fresh-review commands do not start repair, autofix, rebase, CI repair, or automerge; those execution lanes are retired.\n- Maintainers can comment `@clawsweeper explain` to ask for more context, or `@clawsweeper stop` to stop active automation.\n\n</details>\n\n\n_Reviewed October 27, 2026, 2:09 AM ET / 06:09 UTC._\n\n<!-- clawsweeper-review-version item=185534 reviewed_at=2026-10-27T06:09:57.542Z sha=na source_revision=17c41aa4705b0e6a08a0ea4b8b32944e5e885affe22685132f3d26a7070c8a8e lease_owner=github-run-40459077239-1 lease_comment_id=6435055295 v=1 -->\n\n<!-- clawsweeper-review item=185534 -->",
+      "createdAt": "2026-10-27T06:05:33Z",
+      "includesCreatedEdit": true,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/openclaw/openclaw/issues/185534#issuecomment-6435041216",
+      "viewerDidAuthor": false
+    }
+  ],
+  "createdAt": "2026-10-27T05:57:02Z",
+  "labels": [
+    {
+      "id": "LA_kwDOQb6kR88AAAACQomLZw",
+      "name": "bug",
+      "description": "Something isn't working",
+      "color": "d73a4a"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACXnEpkg",
+      "name": "no-stale",
+      "description": "Exclude from stale automation",
+      "color": "8C959F"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACZxxN7g",
+      "name": "bug:behavior",
+      "description": "Incorrect behavior without a crash",
+      "color": "D73A4A"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjeO6aQ",
+      "name": "P2",
+      "description": "Normal backlog priority with limited blast radius.",
+      "color": "FBCA04"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLR3A",
+      "name": "clawsweeper:fix-shape-clear",
+      "description": "ClawSweeper found a clear likely implementation shape for this issue.",
+      "color": "1A7F37"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLU0Q",
+      "name": "clawsweeper:queueable-fix",
+      "description": "ClawSweeper marked this issue as an existing queue_fix_pr work candidate.",
+      "color": "0E8A16"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjfLcuw",
+      "name": "clawsweeper:source-repro",
+      "description": "ClawSweeper found a high-confidence source-level issue reproduction.",
+      "color": "0A3069"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACjodgyQ",
+      "name": "issue-rating: 🦞 diamond lobster",
+      "description": "Very strong issue quality with high-confidence source-level or clear reproduction.",
+      "color": "0969DA"
+    },
+    {
+      "id": "LA_kwDOQb6kR88AAAACklv8uw",
+      "name": "impact:other",
+      "description": "This issue has meaningful maintainer-visible impact outside the owned taxonomy.",
+      "color": "C5DEF5"
+    }
+  ],
+  "number": 185534,
+  "state": "OPEN",
+  "title": "[Bug]: cleanSchemaForGemini makes read({ optional }) input schema unsatisfiable in Code Mode / Tool Search",
+  "updatedAt": "2026-10-27T06:10:42Z",
+  "url": "https://github.com/openclaw/openclaw/issues/185534",
+  "captured_at_utc": "2026-11-01T13:38:14.078498+00:00",
+  "closing_pr_snapshots": [
+    {
+      "headRefOid": "e889d76561e306aab58c45e8c059280ed2db9c71",
+      "mergedAt": null,
+      "number": 185581,
+      "state": "OPEN",
+      "url": "https://github.com/openclaw/openclaw/pull/185581"
+    }
+  ]
+}
