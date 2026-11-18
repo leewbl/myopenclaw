@@ -54,6 +54,20 @@ WebSocket opening-handshake timeouts report a Gateway transport error with
 
 ### `gateway health`
 
+`gateway health` fetches a health snapshot over WebSocket RPC. Its default
+RPC timeout is **10,000 ms**. Use `--timeout <ms>` to give a slow Gateway
+longer to answer; for example, this checks a local Gateway with a 30-second RPC
+deadline. Replace the placeholder with your Gateway token:
+
+```bash
+openclaw gateway health --url ws://127.0.0.1:18789 --token '<gateway-token>' --timeout 30000 --json
+```
+
+For a local Gateway that is still starting, use [`openclaw health`](/cli/health).
+That command waits for local startup readiness with a default **60-second**
+budget and can report `starting` if the Gateway is still booting. Raising the
+RPC timeout on `gateway health` does not select that startup workflow.
+
 ```bash
 openclaw gateway health --url ws://127.0.0.1:18789
 openclaw gateway health --port 18789
