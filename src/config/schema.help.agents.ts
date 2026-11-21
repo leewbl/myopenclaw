@@ -190,6 +190,10 @@ export const AGENT_FIELD_HELP: Record<string, string> = {
     'How embedded OpenClaw handles workspace-local `.openclaw/settings.json`: "sanitize" (default) strips shellPath/shellCommandPrefix, "ignore" disables project settings entirely, and "trusted" applies project settings as-is.',
   "agents.defaults.embeddedAgent.executionContract":
     'Embedded OpenClaw execution contract: "default" keeps the standard runner behavior, while "strict-agentic" enables structured plan tracking and non-visible turn recovery for supported OpenAI/OpenAI Codex GPT-5-family runs.',
+  "agents.defaults.systemPrompt":
+    "Controls which runtime-owned instruction lines OpenClaw adds to the agent system prompt.",
+  "agents.defaults.systemPrompt.modelIdentity":
+    'Include the "Current model identity: provider/model" instruction line that tells the agent to answer model-identity questions with the raw provider/model ref (default: true). Set false for branded personas or gateway aliases whose routing ref should stay private; the Runtime line\'s model= data field is unaffected.',
   "agents.entries.*.embeddedAgent":
     "Optional per-agent embedded OpenClaw overrides. Use this to opt specific agents into stricter GPT-5 execution behavior without changing the global default.",
   "agents.entries.*.embeddedAgent.executionContract":

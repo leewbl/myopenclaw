@@ -1,3 +1,4 @@
+import { isModelIdentityPromptEnabled } from "../../system-prompt-identity-policy.js";
 import { ensureSystemPromptCacheBoundary } from "@openclaw/ai/internal/shared";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { filterHeartbeatTranscriptArtifacts } from "../../../auto-reply/heartbeat-filter.js";
@@ -285,15 +286,16 @@ export async function prepareEmbeddedAttemptPromptAssembly(input: {
     setSystemPrompt(composedSystemPrompt);
   }
   // Keep current model identity after the stable system cache boundary.
-  const modelAwareSystemPrompt = isSettledTurnFinalization
-    ? systemPromptText
-    : appendModelIdentitySystemPrompt({
-        systemPrompt:
-          buildModelIdentityPromptLine(input.runtimeModel) && systemPromptText.trim().length > 0
-            ? ensureSystemPromptCacheBoundary(systemPromptText)
-            : systemPromptText,
-        model: input.runtimeModel,
-      });
+  const modelAwareSystemPrompt =
+    isSettledTurnFinalization || !isModelIdentityPromptEnabled(readConfig())
+      ? systemPromptText
+      : appendModelIdentitySystemPrompt({
+          systemPrompt:
+            buildModelIdentityPromptLine(input.runtimeModel) && systemPromptText.trim().length > 0
+              ? ensureSystemPromptCacheBoundary(systemPromptText)
+              : systemPromptText,
+          model: input.runtimeModel,
+        });
   if (modelAwareSystemPrompt !== systemPromptText) {
     setSystemPrompt(modelAwareSystemPrompt);
   }

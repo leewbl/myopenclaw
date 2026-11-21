@@ -336,6 +336,8 @@ export function buildAgentSystemPrompt(params: {
   /** Plugin-owned prompt guidance for registered native slash commands. */
   nativeCommandGuidanceLines?: string[];
   runtimeInfo?: SystemPromptRuntimeInfo;
+  /** Include the runtime model identity instruction line. Defaults to true. */
+  modelIdentityPrompt?: boolean;
   messageToolHints?: string[];
   toolSchemaDirectoryPrompt?: string;
   /** Deferred directory tools can be invoked by name in the embedded harness. */
@@ -367,7 +369,10 @@ export function buildAgentSystemPrompt(params: {
 }) {
   const promptMode = params.promptMode ?? "full";
   const runtimeInfo = params.runtimeInfo;
-  const modelIdentityLine = buildModelIdentityPromptLine(blindRuntime(runtimeInfo)?.model);
+  const modelIdentityLine =
+    params.modelIdentityPrompt === false
+      ? undefined
+      : buildModelIdentityPromptLine(blindRuntime(runtimeInfo)?.model);
   if (promptMode === "none") {
     params.onRenderedSkillsPrompt?.("");
     return ["You are a personal assistant running inside OpenClaw.", modelIdentityLine]

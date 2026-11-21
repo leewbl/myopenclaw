@@ -1,3 +1,4 @@
+import { isModelIdentityPromptEnabled } from "../system-prompt-identity-policy.js";
 import {
   ensureSystemPromptCacheBoundary,
   splitSystemPromptRelocatableBoundary,
@@ -25,7 +26,10 @@ import { projectRuntimeContextFragments } from "../internal-runtime-context.js";
 import { buildInterruptedInputContext } from "../interrupted-input-context.js";
 import { buildMediaTaskRuntimeContext } from "../media-generation-task-status.js";
 import { applyPluginTextReplacements } from "../plugin-text-transforms.js";
-import { appendModelIdentitySystemPrompt, buildModelIdentityPromptLine } from "../system-prompt.js";
+import {
+  appendModelIdentitySystemPrompt,
+  buildModelIdentityPromptLine,
+} from "../system-prompt.js";
 import { buildProactiveSubagentOrchestrationSection } from "../ultra-orchestration.js";
 import { cliBackendLog } from "./log.js";
 import type { CliReusableSession, RunCliAgentParams } from "./types.js";
@@ -37,13 +41,17 @@ export function finalizeCliSystemPrompt(
     backendResolved: {
       textTransforms?: { input?: Parameters<typeof applyPluginTextReplacements>[1] };
     };
-    params: Pick<RunCliAgentParams, "sessionEntry">;
+    params: Pick<RunCliAgentParams, "config" | "sessionEntry">;
   },
 ): string {
   const replaced = applyPluginTextReplacements(
     systemPrompt,
     run.backendResolved.textTransforms?.input,
   );
+  // Operators can drop the instruction line entirely (agents.defaults.systemPrompt.modelIdentity).
+  if (!isModelIdentityPromptEnabled(run.params.config)) {
+    return replaced;
+  }
   // A blind child's prompt never names its own model.
   const model = run.params.sessionEntry?.blindPrompt ? undefined : run.modelDisplay;
   // Identity belongs after the cache boundary even for marker-free hook overrides.

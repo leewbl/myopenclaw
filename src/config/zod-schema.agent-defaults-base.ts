@@ -73,6 +73,16 @@ export const AgentDefaultsBaseSchema = z.strictObject({
     .optional(),
   bootstrapMaxChars: z.number().int().positive().optional(),
   bootstrapTotalMaxChars: z.number().int().positive().optional(),
+  systemPrompt: z
+    .strictObject({
+      /**
+       * Include the runtime "Current model identity" instruction line in the system
+       * prompt. Default: true. Set false to keep provider/model refs out of the prompt
+       * when the agent carries its own persona or routes through a gateway alias.
+       */
+      modelIdentity: z.boolean().optional(),
+    })
+    .optional(),
   experimental: z
     .strictObject({
       /** Global opt-in for automatic Decision experiments; model selection is separate. */

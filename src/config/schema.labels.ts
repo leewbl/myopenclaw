@@ -102,6 +102,8 @@ export const FIELD_LABELS: Record<string, string> = {
   "agents.defaults.contextLimits": "Default Context Limits",
   "agents.defaults.contextLimits.memoryGetMaxChars": "Default memory_get Max Chars",
   "agents.defaults.contextLimits.postCompactionMaxChars": "Default Post-compaction Max Chars",
+  "agents.defaults.systemPrompt": "Agent System Prompt",
+  "agents.defaults.systemPrompt.modelIdentity": "Agent Model Identity Prompt",
   "agents.entries": "Agent List",
   "agents.entries.*.skillsLimits": "Agent Skills Limits",
   "agents.entries.*.skillsLimits.maxSkillsPromptChars": "Agent Skills Prompt Max Chars",

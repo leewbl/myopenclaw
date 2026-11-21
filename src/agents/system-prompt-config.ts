@@ -4,6 +4,7 @@
  * This module gathers agent/config knobs before rendering the canonical system
  * prompt so callers do not duplicate owner, TTS, alias, memory, or FS policy.
  */
+import { isModelIdentityPromptEnabled } from "./system-prompt-identity-policy.js";
 import { normalizeOptionalLowercaseString } from "@openclaw/normalization-core/string-coerce";
 import { shouldHandleTextCommands } from "../auto-reply/commands-text-routing.js";
 import { isRestartEnabled } from "../config/commands.flags.js";
@@ -77,6 +78,7 @@ export function buildConfiguredAgentSystemPrompt(params: ConfiguredAgentSystemPr
   return buildAgentSystemPrompt({
     ...renderParams,
     restartCommandsEnabled: isRestartEnabled(config),
+    modelIdentityPrompt: isModelIdentityPromptEnabled(config),
     reasoningCommandsEnabled:
       shouldHandleTextCommands({ cfg: config, surface: channel }) ||
       resolveNativeCommandsEnabled({
