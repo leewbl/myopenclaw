@@ -4,6 +4,7 @@
  * This module gathers agent/config knobs before rendering the canonical system
  * prompt so callers do not duplicate owner, TTS, alias, memory, or FS policy.
  */
+import { isModelIdentityPromptEnabled } from "./system-prompt-identity-policy.js";
 import { normalizeOptionalLowercaseString } from "@openclaw/normalization-core/string-coerce";
 import { shouldHandleTextCommands } from "../auto-reply/commands-text-routing.js";
 import { isRestartEnabled } from "../config/commands.flags.js";
@@ -14,7 +15,7 @@ import type { PreparedTtsPreferences } from "../tts/tts-preferences.js";
 import { buildTtsSystemPromptHint } from "../tts/tts-settings.js";
 import { resolveMainSessionDelegationMode } from "./delegation-guidance.js";
 import type { PreparedModelRuntimeSnapshot } from "./prepared-model-runtime.types.js";
-import { buildAgentSystemPrompt, isModelIdentityPromptEnabled } from "./system-prompt.js";
+import { buildAgentSystemPrompt } from "./system-prompt.js";
 import { resolveEffectiveToolFsWorkspaceOnly } from "./tool-fs-policy.js";
 
 type ConfiguredAgentSystemPromptParams = Parameters<typeof buildAgentSystemPrompt>[0] & {

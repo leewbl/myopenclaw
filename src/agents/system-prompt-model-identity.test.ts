@@ -1,6 +1,7 @@
 // #177432: `agents.defaults.systemPrompt.modelIdentity` gates the runtime
 // "Current model identity" instruction line. The default stays true, and the only
 // prompt bytes that change when it is false are that instruction line itself.
+import { isModelIdentityPromptEnabled } from "./system-prompt-identity-policy.js";
 import { SYSTEM_PROMPT_CACHE_BOUNDARY } from "@openclaw/ai/internal/shared";
 import { describe, expect, it, onTestFinished } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -13,7 +14,6 @@ import { makeProviderModelFixture } from "./test-helpers/provider-model-fixture.
 import {
   buildAgentSystemPrompt,
   buildModelIdentityPromptLine,
-  isModelIdentityPromptEnabled,
 } from "./system-prompt.js";
 import { buildConfiguredAgentSystemPrompt } from "./system-prompt-config.js";
 

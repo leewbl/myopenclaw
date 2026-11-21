@@ -1,3 +1,4 @@
+import { isModelIdentityPromptEnabled } from "../../system-prompt-identity-policy.js";
 import { ensureSystemPromptCacheBoundary } from "@openclaw/ai/internal/shared";
 import { normalizeOptionalString } from "@openclaw/normalization-core/string-coerce";
 import { filterHeartbeatTranscriptArtifacts } from "../../../auto-reply/heartbeat-filter.js";
@@ -29,7 +30,6 @@ import type { AgentSession, SessionManager } from "../../sessions/index.js";
 import {
   appendModelIdentitySystemPrompt,
   buildModelIdentityPromptLine,
-  isModelIdentityPromptEnabled,
 } from "../../system-prompt.js";
 import { log } from "../logger.js";
 import { normalizeAssistantReplayContent } from "../replay-history.js";

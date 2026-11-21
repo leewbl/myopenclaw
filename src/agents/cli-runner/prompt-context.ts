@@ -1,3 +1,4 @@
+import { isModelIdentityPromptEnabled } from "../system-prompt-identity-policy.js";
 import {
   ensureSystemPromptCacheBoundary,
   splitSystemPromptRelocatableBoundary,
@@ -28,7 +29,6 @@ import { applyPluginTextReplacements } from "../plugin-text-transforms.js";
 import {
   appendModelIdentitySystemPrompt,
   buildModelIdentityPromptLine,
-  isModelIdentityPromptEnabled,
 } from "../system-prompt.js";
 import { buildProactiveSubagentOrchestrationSection } from "../ultra-orchestration.js";
 import { cliBackendLog } from "./log.js";
