@@ -5,6 +5,7 @@ import type { AgentDefaultsSchema } from "./zod-schema.agent-defaults.js";
 type SchemaAgentDefaultsConfig = NonNullable<z.input<typeof AgentDefaultsSchema>>;
 
 export type AgentContextInjection = NonNullable<SchemaAgentDefaultsConfig["contextInjection"]>;
+export type AgentSystemPromptConfig = NonNullable<SchemaAgentDefaultsConfig["systemPrompt"]>;
 export type OptionalBootstrapFileName = NonNullable<
   SchemaAgentDefaultsConfig["skipOptionalBootstrapFiles"]
 >[number];

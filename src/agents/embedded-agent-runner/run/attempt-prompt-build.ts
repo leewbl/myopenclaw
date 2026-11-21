@@ -29,6 +29,7 @@ import type { AgentSession, SessionManager } from "../../sessions/index.js";
 import {
   appendModelIdentitySystemPrompt,
   buildModelIdentityPromptLine,
+  isModelIdentityPromptEnabled,
 } from "../../system-prompt.js";
 import { log } from "../logger.js";
 import { normalizeAssistantReplayContent } from "../replay-history.js";
@@ -285,15 +286,16 @@ export async function prepareEmbeddedAttemptPromptAssembly(input: {
     setSystemPrompt(composedSystemPrompt);
   }
   // Keep current model identity after the stable system cache boundary.
-  const modelAwareSystemPrompt = isSettledTurnFinalization
-    ? systemPromptText
-    : appendModelIdentitySystemPrompt({
-        systemPrompt:
-          buildModelIdentityPromptLine(input.runtimeModel) && systemPromptText.trim().length > 0
-            ? ensureSystemPromptCacheBoundary(systemPromptText)
-            : systemPromptText,
-        model: input.runtimeModel,
-      });
+  const modelAwareSystemPrompt =
+    isSettledTurnFinalization || !isModelIdentityPromptEnabled(readConfig())
+      ? systemPromptText
+      : appendModelIdentitySystemPrompt({
+          systemPrompt:
+            buildModelIdentityPromptLine(input.runtimeModel) && systemPromptText.trim().length > 0
+              ? ensureSystemPromptCacheBoundary(systemPromptText)
+              : systemPromptText,
+          model: input.runtimeModel,
+        });
   if (modelAwareSystemPrompt !== systemPromptText) {
     setSystemPrompt(modelAwareSystemPrompt);
   }

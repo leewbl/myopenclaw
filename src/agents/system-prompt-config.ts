@@ -14,7 +14,7 @@ import type { PreparedTtsPreferences } from "../tts/tts-preferences.js";
 import { buildTtsSystemPromptHint } from "../tts/tts-settings.js";
 import { resolveMainSessionDelegationMode } from "./delegation-guidance.js";
 import type { PreparedModelRuntimeSnapshot } from "./prepared-model-runtime.types.js";
-import { buildAgentSystemPrompt } from "./system-prompt.js";
+import { buildAgentSystemPrompt, isModelIdentityPromptEnabled } from "./system-prompt.js";
 import { resolveEffectiveToolFsWorkspaceOnly } from "./tool-fs-policy.js";
 
 type ConfiguredAgentSystemPromptParams = Parameters<typeof buildAgentSystemPrompt>[0] & {
@@ -77,6 +77,7 @@ export function buildConfiguredAgentSystemPrompt(params: ConfiguredAgentSystemPr
   return buildAgentSystemPrompt({
     ...renderParams,
     restartCommandsEnabled: isRestartEnabled(config),
+    modelIdentityPrompt: isModelIdentityPromptEnabled(config),
     reasoningCommandsEnabled:
       shouldHandleTextCommands({ cfg: config, surface: channel }) ||
       resolveNativeCommandsEnabled({

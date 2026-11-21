@@ -29,6 +29,7 @@ import {
 } from "../channels/plugins/native-approval-prompt.js";
 import type { SubagentDelegationMode } from "../config/types.agent-defaults.js";
 import type { MemoryCitationsMode } from "../config/types.memory.js";
+import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { pruneMapToMaxSize } from "../infra/map-size.js";
 import { isOpenClawMainPromptSurface } from "../plugins/agent-prompt-surface-kind.js";
 import {
@@ -249,6 +250,16 @@ export function buildModelIdentityPromptLine(model?: string): string | undefined
   return `${MODEL_IDENTITY_PREFIX} ${trimmed}. If asked what model you are, answer with this value for the current run.`;
 }
 
+/**
+ * Whether the runtime model identity instruction line belongs in the system prompt.
+ *
+ * Backed by `agents.defaults.systemPrompt.modelIdentity`, which defaults to `true` so
+ * existing configs keep the line. The Runtime `model=` data field is unaffected.
+ */
+export function isModelIdentityPromptEnabled(config?: OpenClawConfig): boolean {
+  return config?.agents?.defaults?.systemPrompt?.modelIdentity !== false;
+}
+
 export function appendModelIdentitySystemPrompt(params: {
   systemPrompt: string;
   model?: string;
@@ -336,6 +347,8 @@ export function buildAgentSystemPrompt(params: {
   /** Plugin-owned prompt guidance for registered native slash commands. */
   nativeCommandGuidanceLines?: string[];
   runtimeInfo?: SystemPromptRuntimeInfo;
+  /** Include the runtime model identity instruction line. Defaults to true. */
+  modelIdentityPrompt?: boolean;
   messageToolHints?: string[];
   toolSchemaDirectoryPrompt?: string;
   /** Deferred directory tools can be invoked by name in the embedded harness. */
@@ -367,7 +380,10 @@ export function buildAgentSystemPrompt(params: {
 }) {
   const promptMode = params.promptMode ?? "full";
   const runtimeInfo = params.runtimeInfo;
-  const modelIdentityLine = buildModelIdentityPromptLine(blindRuntime(runtimeInfo)?.model);
+  const modelIdentityLine =
+    params.modelIdentityPrompt === false
+      ? undefined
+      : buildModelIdentityPromptLine(blindRuntime(runtimeInfo)?.model);
   if (promptMode === "none") {
     params.onRenderedSkillsPrompt?.("");
     return ["You are a personal assistant running inside OpenClaw.", modelIdentityLine]
