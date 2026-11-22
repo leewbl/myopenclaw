@@ -23,6 +23,7 @@ export function skill(name: string, overrides: Partial<SkillStatusEntry> = {}): 
     modelVisible: true,
     userInvocable: true,
     commandVisible: true,
+    legacyMetadata: false,
     ...createEmptyInstallChecks(),
     ...overrides,
   };

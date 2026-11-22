@@ -4,6 +4,7 @@ import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import { prepareBinaryAvailability } from "../../shared/config-eval.js";
 import { evaluateEntryRequirementsForCurrentPlatform } from "../../shared/entry-status.js";
+import { hasLegacyClawdbotManifestBlock } from "../../shared/frontmatter.js";
 import { isOsRequirementSatisfied } from "../../shared/requirements.js";
 import { CONFIG_DIR } from "../../utils.js";
 import { prepareSkillLibrarySelection } from "../library/selection.js";
@@ -379,6 +380,7 @@ export function buildWorkspaceSkillStatus(
       userInvocable,
       commandVisible: availableToAgent && userInvocable,
       requirements: required,
+      legacyMetadata: hasLegacyClawdbotManifestBlock({ frontmatter: entry.frontmatter }),
       install: installOptions,
       ...(clawhub ? { clawhub } : {}),
       ...(skillCard ? { skillCard } : {}),

@@ -291,6 +291,39 @@ describe("buildWorkspaceSkillStatus", () => {
     },
   );
 
+  it("flags skills whose metadata block only declares the retired clawdbot key", () => {
+    const metadataFor = (block: unknown) => JSON.stringify(block);
+    const legacyOnly = createEntry("legacy-only", {
+      frontmatter: {
+        metadata: metadataFor({ clawdbot: { requires: { bins: ["fixture-tool"] }, os: ["darwin"] } }),
+      },
+    });
+    const currentOnly = createEntry("current-only", {
+      frontmatter: { metadata: metadataFor({ openclaw: { requires: { bins: ["fixture-tool"] } } }) },
+    });
+    const both = createEntry("both-blocks", {
+      frontmatter: { metadata: metadataFor({ clawdbot: { os: ["darwin"] }, openclaw: { os: ["linux"] } }) },
+    });
+    const none = createEntry("no-metadata");
+
+    const report = buildWorkspaceSkillStatus(workspaceDir, {
+      entries: [legacyOnly, currentOnly, both, none],
+    });
+
+    expect(report.skills.map(({ name, legacyMetadata }) => [name, legacyMetadata])).toEqual([
+      ["legacy-only", true],
+      ["current-only", false],
+      ["both-blocks", false],
+      ["no-metadata", false],
+    ]);
+    // Legacy clawdbot data never contributes requirements or install options.
+    expect(report.skills[0]).toMatchObject({
+      eligible: true,
+      missing: noMissing,
+      install: [],
+    });
+  });
+
   it("does not expose raw config values in config checks", () => {
     const secret = "discord-token-secret-abc"; // pragma: allowlist secret
     const entry = createEntry("discord", {
@@ -448,7 +481,7 @@ function createEntry(
     source = "test",
     baseDir = `/tmp/${name}`,
     ...entry
-  }: Pick<SkillEntry, "metadata" | "invocation" | "exposure"> & {
+  }: Pick<SkillEntry, "metadata" | "invocation" | "exposure" | "frontmatter"> & {
     source?: string;
     baseDir?: string;
   } = {},

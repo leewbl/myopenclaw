@@ -147,6 +147,28 @@ describe("skills formatting", () => {
     expect(output).not.toContain("commands/cron may still use it");
   });
 
+  it("flags skills with legacy-only clawdbot metadata in check output", () => {
+    vi.stubEnv("TERM", "dumb");
+    const mixed = report([
+      skill("legacy-only", { legacyMetadata: true }),
+      skill("current-only"),
+      skill("both-blocks"),
+      skill("no-metadata"),
+    ]);
+    const parsed = JSON.parse(formatSkillsCheck(mixed, { json: true }));
+    expect(parsed.legacyMetadata).toEqual(["legacy-only"]);
+    expect(parsed.summary).toMatchObject({ total: 4, eligible: 4 });
+    const human = formatSkillsCheck(mixed, {});
+    expectContains(
+      human,
+      "Legacy metadata.clawdbot is ignored:",
+      "legacy-only",
+      "rename the metadata.clawdbot block to metadata.openclaw",
+      "docs/tools/skills.md",
+    );
+    expect(human).not.toContain("current-only (");
+  });
+
   it("sanitizes ANSI and C1 controls in JSON fields", () => {
     const entry = skill("json-skill", {
       emoji: "\u001b[31m📧\u001b[0m\u009f",

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { hasLegacyClawdbotManifestBlock } from "../../shared/frontmatter.js";
 import {
   parseSkillFrontmatter,
   resolveSkillManifestMetadata,
@@ -14,6 +15,35 @@ description: Working skill
 : *missing
 ---`),
   ).toThrow(/invalid frontmatter.*YAML_EXCEPTION: Unresolved alias/);
+});
+
+describe("hasLegacyClawdbotManifestBlock", () => {
+  const frontmatterWith = (metadata: unknown) => ({ metadata: JSON.stringify(metadata) });
+  const legacyBlock = { clawdbot: { requires: { bins: ["fixture-tool"] }, os: ["darwin"] } };
+  const currentBlock = { openclaw: { requires: { bins: ["fixture-tool"] } } };
+
+  it("warns only for a clawdbot-only metadata block", () => {
+    expect(hasLegacyClawdbotManifestBlock({ frontmatter: frontmatterWith(legacyBlock) })).toBe(
+      true,
+    );
+    expect(hasLegacyClawdbotManifestBlock({ frontmatter: frontmatterWith(currentBlock) })).toBe(
+      false,
+    );
+    expect(
+      hasLegacyClawdbotManifestBlock({
+        frontmatter: frontmatterWith({ ...legacyBlock, ...currentBlock }),
+      }),
+    ).toBe(false);
+    expect(hasLegacyClawdbotManifestBlock({ frontmatter: {} })).toBe(false);
+  });
+
+  it("ignores non-object clawdbot values and unparsable metadata strings", () => {
+    expect(hasLegacyClawdbotManifestBlock({ frontmatter: { metadata: "clawdbot" } })).toBe(false);
+    expect(hasLegacyClawdbotManifestBlock({ frontmatter: { metadata: "{not json" } })).toBe(false);
+    expect(
+      hasLegacyClawdbotManifestBlock({ frontmatter: frontmatterWith({ clawdbot: "legacy" }) }),
+    ).toBe(false);
+  });
 });
 
 describe("resolveSkillManifestMetadata install validation", () => {
