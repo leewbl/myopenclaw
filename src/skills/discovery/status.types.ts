@@ -35,6 +35,12 @@ export type SkillStatusEntry = {
   modelVisible: boolean;
   userInvocable: boolean;
   commandVisible: boolean;
+  /**
+   * True when the skill's frontmatter metadata block only declares the retired
+   * `clawdbot` key (no `openclaw` key). Read-only diagnostic: the legacy block
+   * is never used for eligibility, requirements, or install options.
+   */
+  legacyMetadata: boolean;
   requirements: Requirements;
   missing: Requirements;
   configChecks: RequirementConfigCheck[];

@@ -46,6 +46,28 @@ export function resolveOpenClawManifestBlock(params: {
   }
 }
 
+/**
+ * Detects a retired `clawdbot`-only manifest block via parsed metadata.
+ * Read-only diagnostics: callers must not use legacy data for eligibility.
+ */
+export function hasLegacyClawdbotManifestBlock(params: {
+  frontmatter: Record<string, unknown>;
+}): boolean {
+  const raw = getFrontmatterString(params.frontmatter, "metadata");
+  if (!raw) {
+    return false;
+  }
+  try {
+    const parsed = asOptionalObjectRecord(parseJsonWithJson5Fallback(raw, JSON5));
+    if (!parsed || MANIFEST_KEY in parsed) {
+      return false;
+    }
+    return asOptionalObjectRecord(parsed.clawdbot) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 /** Extracts normalized runtime requirement lists from an OpenClaw manifest block. */
 export function resolveOpenClawManifestRequires(
   metadataObj: Record<string, unknown>,

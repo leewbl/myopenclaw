@@ -262,6 +262,7 @@ export function formatSkillsCheck(report: SkillStatusReport, opts: SkillsCheckOp
     (s) => s.eligible && !s.blockedByAgentFilter && !s.modelVisible,
   );
   const missingReqs = report.skills.filter(hasMissingSkillRequirements);
+  const legacyMetadata = report.skills.filter((s) => s.legacyMetadata);
   const agentId = report.agentId ?? opts.agent;
 
   if (opts.json) {
@@ -296,6 +297,7 @@ export function formatSkillsCheck(report: SkillStatusReport, opts: SkillsCheckOp
         missing: s.missing,
         install: s.install,
       })),
+      legacyMetadata: legacyMetadata.map((s) => s.name),
     });
   }
 
@@ -366,6 +368,18 @@ export function formatSkillsCheck(report: SkillStatusReport, opts: SkillsCheckOp
     ),
     ...formatSkillCheckSection("Missing requirements:", missingReqs, formatSkillMissingSummary),
   );
+
+  if (legacyMetadata.length > 0) {
+    lines.push(
+      "",
+      theme.warn(decorativePrefix("⚠", "Legacy metadata.clawdbot is ignored:")),
+      ...legacyMetadata.map((s) => `  ${terminalText`${s.name}`}`),
+      theme.muted(
+        "  Fix: rename the metadata.clawdbot block to metadata.openclaw in each SKILL.md.",
+      ),
+      theme.muted("  OpenClaw does not rewrite the file; see docs/tools/skills.md."),
+    );
+  }
 
   return appendClawHubHint(lines.join("\n"));
 }
